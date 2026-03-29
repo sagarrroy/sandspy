@@ -1,0 +1,36 @@
+[agent]
+name = "Cursor"
+process_names = ["cursor", "cursor-helper"]
+description = "Anysphere's AI-powered code editor"
+
+[expected.network]
+allowed_domains = [
+  "api2.cursor.sh", "api3.cursor.sh", "api4.cursor.sh", "api5.cursor.sh",
+  "repo42.cursor.sh", "cursor-cdn.com", "marketplace.cursorapi.com",
+  "authenticate.cursor.sh", "*.gcpp.cursor.sh",
+  "telemetry.cursor.sh", "*.statsig.com",
+]
+
+[expected.filesystem]
+normal_patterns = [
+  "**/*.rs", "**/*.py", "**/*.ts", "**/*.js", "**/*.tsx", "**/*.jsx",
+  "**/Cargo.toml", "**/package.json", "**/tsconfig.json",
+  "**/.git/**", "**/README*", "**/LICENSE*",
+]
+
+[alerts]
+sensitive_file_access = true
+unknown_network = true
+shell_dangerous_commands = true
+clipboard_read = true
+env_secret_access = true
+excessive_file_reads = 500
+excessive_data_out = "10MB"
+
+[risk_weights]
+sensitive_file_read = 15
+unknown_network_connection = 25
+secret_env_access = 20
+dangerous_command = 30
+clipboard_read = 10
+excessive_scope = 15

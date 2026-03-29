@@ -1,0 +1,27 @@
+[microsoft_telemetry]
+domains = ["telemetry.microsoft.com", "vortex.data.microsoft.com"]
+category = "telemetry"
+
+[cursor_telemetry]
+domains = ["telemetry.cursor.sh"]
+category = "telemetry"
+
+[statsig]
+domains = ["api.statsig.com", "events.statsig.com", "featuregates.org"]
+category = "telemetry"
+
+[sentry]
+domains = ["sentry.io", "o1.ingest.sentry.io", "o2.ingest.sentry.io"]
+category = "telemetry"
+
+[amplitude]
+domains = ["api.amplitude.com", "api2.amplitude.com"]
+category = "tracking"
+
+[mixpanel]
+domains = ["api.mixpanel.com", "data.mixpanel.com"]
+category = "tracking"
+
+[segment]
+domains = ["api.segment.io", "cdn.segment.com"]
+category = "tracking"

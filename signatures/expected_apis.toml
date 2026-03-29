@@ -1,0 +1,20 @@
+[anthropic]
+domains = ["api.anthropic.com", "claude.anthropic.com", "statsig.anthropic.com"]
+
+[openai]
+domains = ["api.openai.com", "cdn.openai.com", "files.openai.com"]
+
+[google_ai]
+domains = ["generativelanguage.googleapis.com", "aiplatform.googleapis.com"]
+
+[cohere]
+domains = ["api.cohere.ai", "api.cohere.com"]
+
+[mistral]
+domains = ["api.mistral.ai"]
+
+[codeium]
+domains = ["api.codeium.com", "server.codeium.com"]
+
+[cursor]
+domains = ["api2.cursor.sh", "api3.cursor.sh", "api4.cursor.sh", "api5.cursor.sh", "repo42.cursor.sh"]

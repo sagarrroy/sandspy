@@ -1,0 +1,27 @@
+[agent]
+name = "OpenAI Codex CLI"
+process_names = ["codex"]
+description = "OpenAI's Codex CLI agent"
+
+[expected.network]
+allowed_domains = ["api.openai.com", "*.openai.com"]
+
+[expected.filesystem]
+normal_patterns = ["**/*.rs", "**/*.py", "**/*.ts", "**/*.js", "**/.git/**", "**/README*"]
+
+[alerts]
+sensitive_file_access = true
+unknown_network = true
+shell_dangerous_commands = true
+clipboard_read = true
+env_secret_access = true
+excessive_file_reads = 500
+excessive_data_out = "10MB"
+
+[risk_weights]
+sensitive_file_read = 15
+unknown_network_connection = 25
+secret_env_access = 20
+dangerous_command = 30
+clipboard_read = 10
+excessive_scope = 15
