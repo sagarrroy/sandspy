@@ -19,3 +19,7 @@ Thumbs.db
 
 # NOTE: Cargo.lock is NOT ignored — this is a binary project.
 # Cargo.lock must be committed for reproducible builds.
+
+# Planning documents — kept local only, not for public repo
+technical_implementation.md
+implementation_plan.md
