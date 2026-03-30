@@ -131,10 +131,19 @@ fn render_frame(frame: &mut Frame, app: &App) {
 
 fn handle_key(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
     match code {
-        // Quit
-        KeyCode::Char('q') | KeyCode::Esc => app.should_quit = true,
+        // Quit — only 'q' and Ctrl+C
+        KeyCode::Char('q') => app.should_quit = true,
         KeyCode::Char('c') if modifiers.contains(KeyModifiers::CONTROL) => {
             app.should_quit = true;
+        }
+
+        // Escape — go back to dashboard (or quit if already there)
+        KeyCode::Esc => {
+            if app.active_tab == Tab::Dashboard {
+                app.should_quit = true;
+            } else {
+                app.switch_tab(Tab::Dashboard);
+            }
         }
 
         // Tab switching — letters

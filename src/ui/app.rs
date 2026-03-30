@@ -195,9 +195,9 @@ impl App {
         self.events.push_back(event);
     }
 
-    /// Update risk score (keep max).
+    /// Update risk score — accumulates additively, capped at 100.
     pub fn update_risk(&mut self, score: u32) {
-        self.risk.score = self.risk.score.max(score);
+        self.risk.score = (self.risk.score + score).min(100);
     }
 
     /// Add a finding, keeping the list capped at 500.

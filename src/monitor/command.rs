@@ -44,6 +44,11 @@ pub async fn run(tx: mpsc::Sender<Event>, pids: PidSet) -> Result<()> {
                 continue;
             }
 
+            // Filter out Electron/Chromium internal subprocess noise
+            if is_internal_spawn(&command) {
+                continue;
+            }
+
             let risk = classify_command_risk(&command);
             let working_dir = process
                 .cwd()
@@ -73,10 +78,56 @@ fn join_cmdline(cmdline: &[OsString]) -> String {
         .join(" ")
 }
 
+/// Returns true for Electron/Chromium internal subprocess launches that
+/// create noise in the event feed. These are NOT the AI agent's actual
+/// commands — they are browser engine internals.
+fn is_internal_spawn(command: &str) -> bool {
+    let lower = command.to_ascii_lowercase();
+
+    // Electron/Chromium subprocess types
+    if lower.contains("--type=gpu")
+        || lower.contains("--type=renderer")
+        || lower.contains("--type=utility")
+        || lower.contains("--type=broker")
+        || lower.contains("--type=zygote")
+        || lower.contains("--type=crashpad")
+    {
+        return true;
+    }
+
+    // Chromium IPC/mojo internals
+    if lower.contains("--mojo-platform-channel-handle")
+        || lower.contains("/prefetch:")
+        || lower.contains("--no-sandbox --field-trial")
+        || lower.contains("--crashpad-handler")
+    {
+        return true;
+    }
+
+    // Electron's own sub-invocations
+    if lower.contains("--ms-enable") || lower.contains("--vscode-") || lower.contains("--cursor-") {
+        return true;
+    }
+
+    false
+}
+
 fn classify_command_risk(command: &str) -> RiskLevel {
     let normalized = command.to_ascii_lowercase();
 
-    let critical_patterns = ["rm -rf", "curl | sh", "wget | bash"];
+    let critical_patterns = [
+        "rm -rf /",
+        "curl | sh",
+        "curl | bash",
+        "wget | sh",
+        "wget | bash",
+        "powershell -enc",
+        "powershell -encodedcommand",
+        "iex (new-object",
+        "invoke-expression",
+        "format-volume",
+        "del /s /q c:",
+    ];
     if critical_patterns
         .iter()
         .any(|pattern| normalized.contains(pattern))
@@ -84,12 +135,31 @@ fn classify_command_risk(command: &str) -> RiskLevel {
         return RiskLevel::Critical;
     }
 
-    let high_patterns = ["chmod", "chown", "netcat", "nc "];
+    let high_patterns = [
+        "chmod", "chown", "netcat", "nc ", "ncat",
+        "reg add", "reg delete",
+        "schtasks", "sc create", "sc start",
+        "certutil -decode", "certutil -urlcache",
+        "bitsadmin",
+    ];
     if high_patterns
         .iter()
         .any(|pattern| normalized.contains(pattern))
     {
         return RiskLevel::High;
+    }
+
+    let medium_patterns = [
+        "env", "printenv", "set ",
+        "curl ", "wget ",
+        "ssh ", "scp ", "rsync ",
+        "docker ", "kubectl ",
+    ];
+    if medium_patterns
+        .iter()
+        .any(|pattern| normalized.contains(pattern))
+    {
+        return RiskLevel::Medium;
     }
 
     RiskLevel::Low

@@ -97,9 +97,9 @@ pub async fn run(tx: mpsc::Sender<Event>, pids: PidSet) -> Result<()> {
             let (domain, _ip_category) = resolver::resolve(&remote_addr);
             let category = categorize_target(&remote_addr, domain.as_deref(), &signatures);
             let risk_score = match category {
-                NetCategory::Unknown => 35,
-                NetCategory::Tracking => 25,
-                NetCategory::Telemetry => 10,
+                NetCategory::Unknown => 8,
+                NetCategory::Tracking => 5,
+                NetCategory::Telemetry => 2,
                 NetCategory::ExpectedApi => 0,
             };
             let event = Event::with_risk(EventKind::NetworkConnection {

@@ -2,7 +2,7 @@
 
 use crate::events::{AgentInfo, Event, EventKind};
 use crate::platform;
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsString;
 use std::process::{Command, Stdio};
@@ -187,6 +187,21 @@ async fn monitor_process_tree(
         for new_pid in current_tree.difference(&previous_tree) {
             if let Some(snapshot) = process_table.get(new_pid) {
                 process_meta.insert(*new_pid, snapshot.clone());
+
+                // Skip Electron/Chromium internal subprocess noise
+                let cmdline_lower = snapshot.cmdline.to_ascii_lowercase();
+                if cmdline_lower.contains("--type=gpu")
+                    || cmdline_lower.contains("--type=renderer")
+                    || cmdline_lower.contains("--type=utility")
+                    || cmdline_lower.contains("--type=broker")
+                    || cmdline_lower.contains("--type=zygote")
+                    || cmdline_lower.contains("--type=crashpad")
+                    || cmdline_lower.contains("--mojo-platform-channel-handle")
+                    || cmdline_lower.contains("/prefetch:")
+                {
+                    continue;
+                }
+
                 let event = Event::new(EventKind::ProcessSpawn {
                     pid: snapshot.pid,
                     name: snapshot.name.clone(),

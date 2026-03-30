@@ -203,13 +203,14 @@ fn render_feed(frame: &mut Frame, area: Rect, app: &App) {
     frame.render_widget(block, area);
 
     let max_lines = inner.height as usize;
+    let feed_width = inner.width as usize;
     let items: Vec<ListItem> = app
         .events
         .iter()
         .rev()
         .take(max_lines)
         .rev()
-        .map(|e| ListItem::new(format_event_line(e, app.no_color)))
+        .map(|e| ListItem::new(format_event_line(e, app.no_color, feed_width)))
         .collect();
 
     let list = List::new(items);
@@ -220,7 +221,9 @@ fn render_feed(frame: &mut Frame, area: Rect, app: &App) {
 
 fn render_shortcuts(frame: &mut Frame, area: Rect, app: &App) {
     let line = Line::from(vec![
-        Span::styled(" [f]", app.style(Style::default().fg(Color::Cyan))),
+        Span::styled(" [1]", app.style(Style::default().fg(Color::Cyan))),
+        Span::styled("home ", app.style(theme::dim())),
+        Span::styled("[f]", app.style(Style::default().fg(Color::Cyan))),
         Span::styled("files ", app.style(theme::dim())),
         Span::styled("[n]", app.style(Style::default().fg(Color::Cyan))),
         Span::styled("net ", app.style(theme::dim())),
@@ -230,8 +233,8 @@ fn render_shortcuts(frame: &mut Frame, area: Rect, app: &App) {
         Span::styled("summary ", app.style(theme::dim())),
         Span::styled("[a]", app.style(Style::default().fg(Color::Cyan))),
         Span::styled("alerts ", app.style(theme::dim())),
-        Span::styled("[tab]", app.style(Style::default().fg(Color::Cyan))),
-        Span::styled("switch ", app.style(theme::dim())),
+        Span::styled("[esc]", app.style(Style::default().fg(Color::Yellow))),
+        Span::styled("back ", app.style(theme::dim())),
         Span::styled("[j/k]", app.style(Style::default().fg(Color::Cyan))),
         Span::styled("scroll ", app.style(theme::dim())),
         Span::styled("[q]", app.style(Style::default().fg(Color::Red))),
@@ -243,7 +246,11 @@ fn render_shortcuts(frame: &mut Frame, area: Rect, app: &App) {
 
 // ─── Shared event formatter (used by feed and other panels) ─────────────────
 
-pub fn format_event_line(event: &Event, no_color: bool) -> Line<'static> {
+pub fn format_event_line(event: &Event, no_color: bool, width: usize) -> Line<'static> {
+    // Dynamic column widths based on terminal width
+    // Layout: timestamp(8) + 2 + tag(5) + 2 + content(dynamic) + 2 + label(8) + bytes(7) = ~34 fixed
+    let content_width = width.saturating_sub(36).max(20);
+
     if no_color {
         let plain = match &event.kind {
             EventKind::FileRead { path, .. } => format!("FILE READ {}", path.display()),
@@ -278,7 +285,7 @@ pub fn format_event_line(event: &Event, no_color: bool) -> Line<'static> {
                 Span::raw("  "),
                 Span::styled("READ ", theme::tag_read()),
                 Span::raw("  "),
-                Span::styled(truncate_str(&path.display().to_string(), 38), Style::default().fg(Color::White)),
+                Span::styled(truncate_str(&path.display().to_string(), content_width), Style::default().fg(Color::White)),
                 Span::raw("  "),
                 label,
             ])
@@ -290,7 +297,7 @@ pub fn format_event_line(event: &Event, no_color: bool) -> Line<'static> {
                 Span::raw("  "),
                 Span::styled("WRITE", theme::tag_write()),
                 Span::raw("  "),
-                Span::styled(truncate_str(&path.display().to_string(), 38), Style::default().fg(Color::White)),
+                Span::styled(truncate_str(&path.display().to_string(), content_width.saturating_sub(12)), Style::default().fg(Color::White)),
                 Span::raw("  "),
                 Span::styled(diff, theme::tag_write()),
             ])
@@ -300,7 +307,7 @@ pub fn format_event_line(event: &Event, no_color: bool) -> Line<'static> {
             Span::raw("  "),
             Span::styled("DEL  ", theme::tag_delete()),
             Span::raw("  "),
-            Span::styled(path.display().to_string(), theme::tag_delete()),
+            Span::styled(truncate_str(&path.display().to_string(), content_width), theme::tag_delete()),
         ]),
         EventKind::NetworkConnection {
             remote_addr,
@@ -327,7 +334,7 @@ pub fn format_event_line(event: &Event, no_color: bool) -> Line<'static> {
                 Span::raw("  "),
                 Span::styled("NET  ", theme::tag_net()),
                 Span::raw("  "),
-                Span::styled(truncate_str(&host, 32), Style::default().fg(Color::White)),
+                Span::styled(truncate_str(&host, content_width.saturating_sub(18)), Style::default().fg(Color::White)),
                 Span::raw("  "),
                 Span::styled(format!("{:>7}", bytes), theme::dim()),
                 Span::raw("  "),
@@ -346,7 +353,7 @@ pub fn format_event_line(event: &Event, no_color: bool) -> Line<'static> {
                 Span::raw("  "),
                 Span::styled("CMD  ", theme::tag_cmd()),
                 Span::raw("  "),
-                Span::styled(truncate_str(command, 38), Style::default().fg(Color::White)),
+                Span::styled(truncate_str(command, content_width.saturating_sub(10)), Style::default().fg(Color::White)),
                 Span::raw("  "),
                 Span::styled(label_text, label_style),
             ])
@@ -355,8 +362,8 @@ pub fn format_event_line(event: &Event, no_color: bool) -> Line<'static> {
             ts_span,
             Span::raw("  "),
             Span::styled("SECRET", theme::tag_secret()),
-            Span::raw("  "),
-            Span::styled(truncate_str(name, 38), Style::default().fg(Color::Red)),
+            Span::raw(" "),
+            Span::styled(truncate_str(name, content_width), Style::default().fg(Color::Red)),
             Span::raw("  "),
             Span::styled("HIGH", theme::label_high()),
         ]),
@@ -371,7 +378,7 @@ pub fn format_event_line(event: &Event, no_color: bool) -> Line<'static> {
                 Span::raw("  "),
                 Span::styled("ENV  ", theme::tag_env()),
                 Span::raw("  "),
-                Span::styled(truncate_str(name, 38), Style::default().fg(Color::White)),
+                Span::styled(truncate_str(name, content_width), Style::default().fg(Color::White)),
                 Span::raw("  "),
                 label,
             ])
@@ -402,16 +409,23 @@ pub fn format_event_line(event: &Event, no_color: bool) -> Line<'static> {
                 Span::raw("  "),
                 Span::styled("ALERT", theme::tag_alert()),
                 Span::raw("  "),
-                Span::styled(message.clone(), msg_style),
+                Span::styled(truncate_str(message, content_width), msg_style),
             ])
         }
-        EventKind::ProcessSpawn { name, pid, .. } => Line::from(vec![
-            ts_span,
-            Span::raw("  "),
-            Span::styled("PROC ", theme::tag_proc()),
-            Span::raw("  "),
-            Span::styled(format!("{name} (pid {pid})"), theme::dim()),
-        ]),
+        EventKind::ProcessSpawn { name, pid, cmdline, .. } => {
+            let desc = if cmdline.len() > 40 {
+                format!("{name} (pid {pid})")
+            } else {
+                format!("{name} (pid {pid}) {cmdline}")
+            };
+            Line::from(vec![
+                ts_span,
+                Span::raw("  "),
+                Span::styled("PROC ", theme::tag_proc()),
+                Span::raw("  "),
+                Span::styled(truncate_str(&desc, content_width), theme::dim()),
+            ])
+        }
         _ => Line::from(Span::raw("")),
     }
 }
