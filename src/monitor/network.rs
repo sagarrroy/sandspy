@@ -94,8 +94,8 @@ pub async fn run(tx: mpsc::Sender<Event>, pids: PidSet) -> Result<()> {
                 continue;
             }
 
-            let (domain, _ip_category) = resolver::resolve(&remote_addr);
-            let category = categorize_target(&remote_addr, domain.as_deref(), &signatures);
+            let (domain, ip_category) = resolver::resolve(&remote_addr);
+            let category = categorize_target(&remote_addr, domain.as_deref(), ip_category, &signatures);
             let risk_score = match category {
                 NetCategory::Unknown => 8,
                 NetCategory::Tracking => 5,
@@ -155,7 +155,12 @@ fn load_signature_map(path: &Path) -> Result<HashMap<String, SignatureEntry>> {
     Ok(parsed)
 }
 
-fn categorize_target(target: &str, domain: Option<&str>, signatures: &SignatureDb) -> NetCategory {
+fn categorize_target(
+    target: &str,
+    domain: Option<&str>,
+    ip_category: crate::analysis::resolver::IpCategory,
+    signatures: &SignatureDb,
+) -> NetCategory {
     if let Some(domain_name) = domain {
         if signatures
             .expected_domains
@@ -200,7 +205,20 @@ fn categorize_target(target: &str, domain: Option<&str>, signatures: &SignatureD
         }
     }
 
-    NetCategory::Unknown
+    // Fallback: use IP range classification
+    // Known cloud providers are not "unknown" — they're expected infrastructure
+    use crate::analysis::resolver::IpCategory;
+    match ip_category {
+        IpCategory::Google => NetCategory::ExpectedApi,
+        IpCategory::Aws => NetCategory::ExpectedApi,
+        IpCategory::Cloudflare => NetCategory::ExpectedApi,
+        IpCategory::Private
+        | IpCategory::Loopback
+        | IpCategory::LinkLocal
+        | IpCategory::Multicast
+        | IpCategory::Documentation => NetCategory::ExpectedApi,
+        IpCategory::Unknown => NetCategory::Unknown,
+    }
 }
 
 fn domain_matches(pattern: &str, target: &str) -> bool {

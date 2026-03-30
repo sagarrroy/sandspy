@@ -116,7 +116,6 @@ fn render_files_stats(frame: &mut Frame, area: Rect, app: &App) {
 
 fn render_network_stats(frame: &mut Frame, area: Rect, app: &App) {
     let s = &app.stats;
-    let bytes_str = theme::format_bytes(s.bytes_out);
     let unknown_str = if s.net_unknown > 0 {
         format!("{} [!]", s.net_unknown)
     } else {
@@ -125,12 +124,19 @@ fn render_network_stats(frame: &mut Frame, area: Rect, app: &App) {
 
     let text = vec![
         Line::from(vec![
-            Span::styled("  connect: ", app.style(theme::dim())),
+            Span::styled("  total:   ", app.style(theme::dim())),
             Span::styled(s.net_connections.to_string(), app.style(Style::default().fg(Color::White))),
         ]),
         Line::from(vec![
-            Span::styled("  data:    ", app.style(theme::dim())),
-            Span::styled(bytes_str, app.style(Style::default().fg(Color::White))),
+            Span::styled("  trackers:", app.style(theme::dim())),
+            Span::styled(
+                s.net_tracking.to_string(),
+                if s.net_tracking > 0 {
+                    app.style(theme::stat_danger())
+                } else {
+                    app.style(theme::stat_normal())
+                },
+            ),
         ]),
         Line::from(vec![
             Span::styled("  unknown: ", app.style(theme::dim())),
@@ -204,8 +210,13 @@ fn render_feed(frame: &mut Frame, area: Rect, app: &App) {
 
     let max_lines = inner.height as usize;
     let feed_width = inner.width as usize;
-    let items: Vec<ListItem> = app
+    // Only show events we can meaningfully display (no ProcessExit, no blanks)
+    let displayable: Vec<&Event> = app
         .events
+        .iter()
+        .filter(|e| is_displayable(&e.kind))
+        .collect();
+    let items: Vec<ListItem> = displayable
         .iter()
         .rev()
         .take(max_lines)
@@ -215,6 +226,12 @@ fn render_feed(frame: &mut Frame, area: Rect, app: &App) {
 
     let list = List::new(items);
     frame.render_widget(list, inner);
+}
+
+/// Returns true for event kinds we want in the live feed.
+/// ProcessExit renders as a blank line and adds noise.
+fn is_displayable(kind: &EventKind) -> bool {
+    !matches!(kind, EventKind::ProcessExit { .. })
 }
 
 // ─── Shortcut bar ───────────────────────────────────────────────────────────
@@ -314,15 +331,15 @@ pub fn format_event_line(event: &Event, no_color: bool, width: usize) -> Line<'s
             remote_port,
             domain,
             category,
-            bytes_sent,
-            bytes_recv,
             ..
         } => {
+            // Show the most informative host: domain if resolved, else IP
             let host = domain
                 .as_deref()
                 .map(|d| format!("{d}:{remote_port}"))
                 .unwrap_or_else(|| format!("{remote_addr}:{remote_port}"));
-            let bytes = theme::format_bytes(bytes_sent + bytes_recv);
+            // Infer owner from IP for display
+            let owner = infer_owner(remote_addr);
             let (label_text, label_style) = match category {
                 NetCategory::ExpectedApi => ("ok     ", theme::label_ok()),
                 NetCategory::Telemetry => ("telem  ", theme::label_telemetry()),
@@ -334,9 +351,9 @@ pub fn format_event_line(event: &Event, no_color: bool, width: usize) -> Line<'s
                 Span::raw("  "),
                 Span::styled("NET  ", theme::tag_net()),
                 Span::raw("  "),
-                Span::styled(truncate_str(&host, content_width.saturating_sub(18)), Style::default().fg(Color::White)),
+                Span::styled(truncate_str(&host, content_width.saturating_sub(20)), Style::default().fg(Color::White)),
                 Span::raw("  "),
-                Span::styled(format!("{:>7}", bytes), theme::dim()),
+                Span::styled(format!("{:>9}", owner), theme::dim()),
                 Span::raw("  "),
                 Span::styled(label_text, label_style),
             ])
@@ -435,5 +452,36 @@ fn truncate_str(s: &str, max: usize) -> String {
         format!("{:<width$}", s, width = max)
     } else {
         format!("{}…", &s[..max - 1])
+    }
+}
+
+/// Parse the remote IP and return its operator name for display.
+fn infer_owner(addr: &str) -> &'static str {
+    use std::net::IpAddr;
+    let ip = match addr.parse::<IpAddr>() {
+        Ok(ip) => ip,
+        Err(_) => return "unknown",
+    };
+    let IpAddr::V4(v4) = ip else { return "IPv6" };
+    let octets = v4.octets();
+    match octets[0] {
+        // Google: 34, 35, 66, 74, 142, 216
+        34 | 35 => "Google",
+        66 if octets[1] == 249 => "Google",
+        74 if octets[1] == 125 => "Google",
+        142 if octets[1] >= 250 => "Google",
+        216 if octets[1] == 58 || octets[1] == 239 => "Google",
+        // AWS: 3, 52, 54
+        3 | 52 | 54 => "AWS",
+        // Azure: 13, 20, 40
+        13 | 20 => "Azure",
+        40 if octets[1] >= 64 => "Azure",
+        // Cloudflare: 104, 108, 162, 172, 188
+        104 if octets[1] >= 16 && octets[1] < 32 => "Cloudflr",
+        108 if octets[1] == 162 => "Cloudflr",
+        162 if octets[1] >= 158 => "Cloudflr",
+        172 if octets[1] >= 64 && octets[1] < 72 => "Cloudflr",
+        // Anthropic / OpenAI use Cloudflare/AWS, so those are covered above
+        _ => "unknown",
     }
 }

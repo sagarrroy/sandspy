@@ -118,18 +118,76 @@ fn categorize_v4(ip: Ipv4Addr) -> IpCategory {
 		return IpCategory::Multicast;
 	}
 
-	if in_cidr(ip, Ipv4Addr::new(52, 0, 0, 0), 8) {
+	// === AWS ===
+	// 52.0.0.0/8, 54.0.0.0/8 (classic EC2 ranges)
+	if in_cidr(ip, Ipv4Addr::new(52, 0, 0, 0), 8)
+		|| in_cidr(ip, Ipv4Addr::new(54, 0, 0, 0), 8)
+	{
+		return IpCategory::Aws;
+	}
+	// 3.0.0.0/8 — AWS us-east modern range
+	if in_cidr(ip, Ipv4Addr::new(3, 0, 0, 0), 8) {
 		return IpCategory::Aws;
 	}
 
-	if in_cidr(ip, Ipv4Addr::new(104, 16, 0, 0), 13) {
+	// === Cloudflare ===
+	// 104.16.0.0/13, 162.158.0.0/15, 172.64.0.0/13, 108.162.192.0/18
+	if in_cidr(ip, Ipv4Addr::new(104, 16, 0, 0), 13)
+		|| in_cidr(ip, Ipv4Addr::new(162, 158, 0, 0), 15)
+		|| in_cidr(ip, Ipv4Addr::new(172, 64, 0, 0), 13)
+		|| in_cidr(ip, Ipv4Addr::new(108, 162, 192, 0), 18)
+		|| in_cidr(ip, Ipv4Addr::new(188, 114, 96, 0), 20)
+	{
 		return IpCategory::Cloudflare;
 	}
 
-	if in_cidr(ip, Ipv4Addr::new(142, 250, 0, 0), 15) {
+	// === Google ===
+	// 142.250.0.0/15, 142.251.0.0/16 — Google Services
+	if in_cidr(ip, Ipv4Addr::new(142, 250, 0, 0), 15)
+		|| in_cidr(ip, Ipv4Addr::new(142, 251, 0, 0), 16)
+	{
+		return IpCategory::Google;
+	}
+	// 216.58.0.0/16, 216.239.0.0/16 — Google infrastructure / Anycast
+	if in_cidr(ip, Ipv4Addr::new(216, 58, 0, 0), 16)
+		|| in_cidr(ip, Ipv4Addr::new(216, 239, 0, 0), 16)
+	{
+		return IpCategory::Google;
+	}
+	// 34.0.0.0/8 — Google Cloud (GCP)
+	if in_cidr(ip, Ipv4Addr::new(34, 0, 0, 0), 8) {
+		return IpCategory::Google;
+	}
+	// 35.186.0.0/16, 35.190.0.0/16, 35.192.0.0/12 — more GCP
+	if in_cidr(ip, Ipv4Addr::new(35, 0, 0, 0), 8) {
+		return IpCategory::Google;
+	}
+	// 74.125.0.0/16 — Google core
+	if in_cidr(ip, Ipv4Addr::new(74, 125, 0, 0), 16) {
+		return IpCategory::Google;
+	}
+	// 66.249.64.0/19 — Googlebot / crawlers
+	if in_cidr(ip, Ipv4Addr::new(66, 249, 64, 0), 19) {
 		return IpCategory::Google;
 	}
 
+	// === Microsoft Azure ===
+	// 20.0.0.0/8 — Azure public IPs (massive range)
+	if in_cidr(ip, Ipv4Addr::new(20, 0, 0, 0), 8) {
+		return IpCategory::Aws; // re-use Aws = "Big Tech Cloud" for now
+	}
+	// 40.64.0.0/10 — Azure
+	if in_cidr(ip, Ipv4Addr::new(40, 64, 0, 0), 10) {
+		return IpCategory::Aws;
+	}
+	// 13.64.0.0/11, 13.104.0.0/14 — Azure Global
+	if in_cidr(ip, Ipv4Addr::new(13, 64, 0, 0), 11)
+		|| in_cidr(ip, Ipv4Addr::new(13, 104, 0, 0), 14)
+	{
+		return IpCategory::Aws;
+	}
+
+	// === Documentation / RFC5737
 	if in_cidr(ip, Ipv4Addr::new(192, 0, 2, 0), 24)
 		|| in_cidr(ip, Ipv4Addr::new(198, 51, 100, 0), 24)
 		|| in_cidr(ip, Ipv4Addr::new(203, 0, 113, 0), 24)
