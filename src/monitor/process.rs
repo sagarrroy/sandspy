@@ -1,6 +1,7 @@
 // sandspy::monitor::process — Process tree monitoring
 
 use crate::events::{AgentInfo, Event, EventKind};
+use crate::platform;
 use anyhow::{anyhow, Context, Result};
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsString;
@@ -172,22 +173,19 @@ fn collect_process_tree(root_pid: u32, process_table: &HashMap<u32, ProcessSnaps
     }
 
     let mut tree = HashSet::new();
+    let mut frontier = vec![root_pid];
     tree.insert(root_pid);
 
-    let mut changed = true;
-    while changed {
-        changed = false;
-
+    while let Some(current_pid) = frontier.pop() {
         for (pid, process) in process_table {
-            if tree.contains(pid) {
-                continue;
+            if process.parent_pid == Some(current_pid) && tree.insert(*pid) {
+                frontier.push(*pid);
             }
+        }
 
-            if let Some(parent) = process.parent_pid {
-                if tree.contains(&parent) {
-                    tree.insert(*pid);
-                    changed = true;
-                }
+        for child_pid in platform::process_tree(current_pid) {
+            if process_table.contains_key(&child_pid) && tree.insert(child_pid) {
+                frontier.push(child_pid);
             }
         }
     }
