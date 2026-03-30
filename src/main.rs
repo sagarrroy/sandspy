@@ -254,44 +254,63 @@ async fn handle_watch(command: String, global: GlobalOptions) -> Result<()> {
         Verbosity::All => 3,
     };
     let session_start_utc = chrono::Utc::now();
-
-    let printer_handle = tokio::spawn(async move {
-        ui::live::run(&mut rx, &agent_label, verbosity_level).await
-    });
-
-    process_handle.await??;
-    filesystem_handle.abort();
-    let _ = filesystem_handle.await;
-    network_handle.abort();
-    let _ = network_handle.await;
-    command_handle.abort();
-    let _ = command_handle.await;
-    environment_handle.abort();
-    let _ = environment_handle.await;
-    clipboard_handle.abort();
-    let _ = clipboard_handle.await;
-
-    let seen_pids = {
+    let agent_pid_hint = {
         let guard = process_state.read().await;
-        guard.seen.clone()
+        guard.seen.iter().min().copied()
     };
-    monitor::memory::run(tx.clone(), session_start, &seen_pids).await?;
-    time::sleep(Duration::from_millis(250)).await;
 
-    drop(tx);
-    let live_stats = printer_handle.await?;
+    // Branch: TUI dashboard vs plain live stream
+    let live_stats = if global.dashboard {
+        // Dashboard mode: rx moves into the TUI runner
+        let stats = ui::run_dashboard(rx, agent_label.clone(), agent_pid_hint).await?;
+        // Abort all monitors since user quit
+        process_handle.abort();
+        filesystem_handle.abort();
+        network_handle.abort();
+        command_handle.abort();
+        environment_handle.abort();
+        clipboard_handle.abort();
+        drop(tx);
+        stats
+    } else {
+        // Live stream mode: spawn printer, wait for process to finish naturally
+        let printer_handle = tokio::spawn(async move {
+            ui::live::run(&mut rx, &agent_label, verbosity_level).await
+        });
+
+        process_handle.await??;
+        filesystem_handle.abort();
+        let _ = filesystem_handle.await;
+        network_handle.abort();
+        let _ = network_handle.await;
+        command_handle.abort();
+        let _ = command_handle.await;
+        environment_handle.abort();
+        let _ = environment_handle.await;
+        clipboard_handle.abort();
+        let _ = clipboard_handle.await;
+
+        let seen_pids = {
+            let guard = process_state.read().await;
+            guard.seen.clone()
+        };
+        monitor::memory::run(tx.clone(), session_start, &seen_pids).await?;
+        time::sleep(Duration::from_millis(250)).await;
+        drop(tx);
+        printer_handle.await?
+    };
 
     let duration_secs = live_stats.start.elapsed().as_secs();
-    let agent_pid = seen_pids.iter().min().copied();
+    let agent_pid = agent_pid_hint;
     let metadata = history::SessionMetadata {
         agent_name: command.clone(),
         pid: agent_pid,
         duration: duration_secs,
         risk_score: live_stats.risk_score,
-        event_count: live_stats.events.len(),
+        event_count: live_stats.event_count,
         timestamp: session_start_utc,
     };
-    let session_id = history::persist_session(&metadata, &live_stats.events)?;
+    let session_id = history::persist_session(&metadata, &[])?;
 
     // Print post-session summary
     let summary_data = ui::summary::SessionData {
@@ -299,14 +318,15 @@ async fn handle_watch(command: String, global: GlobalOptions) -> Result<()> {
         agent_pid,
         start: session_start_utc,
         end: chrono::Utc::now(),
-        events: live_stats.events.clone(),
+        events: vec![],
         risk_score: live_stats.risk_score,
     };
     ui::summary::print_summary(&summary_data);
-    println!("saved session: {}", session_id);
+    println!("  session saved: {}", session_id);
 
     Ok(())
 }
+
 
 async fn handle_attach(pid: Option<u32>, name: Option<String>, global: GlobalOptions) -> Result<()> {
     tracing::info!(
