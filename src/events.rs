@@ -151,3 +151,27 @@ pub struct AgentInfo {
     pub name: String,
     pub uptime_secs: u64,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_event_creation_basics() {
+        let e = Event::new(EventKind::FileRead { path: PathBuf::from("/etc/passwd"), sensitive: true, category: crate::events::FileCategory::Config });
+        assert_eq!(e.risk_score, 0); // Defaults to 0
+        match e.kind {
+            EventKind::FileRead { path, .. } => {
+                assert_eq!(path.to_str().unwrap(), "/etc/passwd");
+            }
+            _ => panic!("Wrong variant!"),
+        }
+    }
+
+    #[test]
+    fn test_event_with_risk() {
+        let e = Event::with_risk(EventKind::ClipboardRead { content_type: "text".to_string(), contains_secret: true }, 55);
+        assert_eq!(e.risk_score, 55);
+    }
+}

@@ -207,3 +207,42 @@ fn truncate(value: &str, max: usize) -> String {
         format!("{}…", &value[..max - 1])
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::TimeZone;
+
+    #[test]
+    fn test_format_duration() {
+        assert_eq!(format_duration(45), "45s");
+        assert_eq!(format_duration(65), "1m5s");
+        assert_eq!(format_duration(120), "2m0s");
+    }
+
+    #[test]
+    fn test_truncate() {
+        assert_eq!(truncate("hello", 10), "hello");
+        assert_eq!(truncate("hello", 4), "hel…");
+    }
+
+    #[test]
+    fn test_session_metadata_serialization() {
+        let meta = SessionMetadata {
+            agent_name: "TestAgent".to_string(),
+            pid: Some(1000),
+            timestamp: chrono::Utc.with_ymd_and_hms(2026, 3, 30, 22, 16, 52).unwrap(),
+            duration: 153,
+            event_count: 85,
+            risk_score: 100,
+        };
+
+        let json = serde_json::to_string(&meta).unwrap();
+        assert!(json.contains("TestAgent"));
+        
+        let deserialized: SessionMetadata = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.agent_name, "TestAgent");
+        assert_eq!(deserialized.duration, 153);
+        assert_eq!(deserialized.risk_score, 100);
+    }
+}

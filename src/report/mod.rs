@@ -170,6 +170,14 @@ pub fn extract_findings(events: &[Event]) -> Vec<Finding> {
 				severity: *severity,
 				message: message.clone(),
 			}),
+			EventKind::SecretAccess { name, source } => findings.push(Finding {
+				severity: RiskLevel::Critical,
+				message: format!("accessed secret {} via {:?}", name, source),
+			}),
+			EventKind::ClipboardRead { contains_secret: true, .. } => findings.push(Finding {
+				severity: RiskLevel::Critical,
+				message: "read secret from clipboard".to_string(),
+			}),
 			_ => {}
 		}
 	}
@@ -177,4 +185,56 @@ pub fn extract_findings(events: &[Event]) -> Vec<Finding> {
 	findings.sort_by(|left, right| right.severity.cmp(&left.severity));
 	findings.truncate(10);
 	findings
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::events::{EventKind, RiskLevel};
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_extract_findings() {
+        let events = vec![
+            Event {
+                timestamp: chrono::Utc::now(),
+                risk_score: 10,
+                kind: EventKind::SecretAccess {
+                    name: "AWSAccessKey".to_string(),
+                    source: crate::events::SecretSource::File,
+                },
+            },
+            Event {
+                timestamp: chrono::Utc::now(),
+                risk_score: 0,
+                kind: EventKind::FileRead {
+                    path: PathBuf::from("random.txt"),
+                    sensitive: false,
+                    category: crate::events::FileCategory::Data,
+                },
+            },
+            Event {
+                timestamp: chrono::Utc::now(),
+                risk_score: 100,
+                kind: EventKind::NetworkConnection {
+                    remote_addr: "100.10.10.1".to_string(),
+                    remote_port: 80,
+                    domain: None,
+                    category: crate::events::NetCategory::Unknown,
+                    bytes_sent: 0,
+                    bytes_recv: 0,
+                },
+            },
+        ];
+
+        let findings = extract_findings(&events);
+        assert_eq!(findings.len(), 2);
+        
+        // Ensure sorted by severity high -> low
+        assert_eq!(findings[0].severity, RiskLevel::Critical); 
+        assert!(findings[0].message.contains("AWSAccessKey"));
+        
+        assert_eq!(findings[1].severity, RiskLevel::High);
+        assert!(findings[1].message.contains("unknown network"));
+    }
 }

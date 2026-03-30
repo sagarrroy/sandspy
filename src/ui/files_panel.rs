@@ -5,8 +5,8 @@ use crate::ui::{app::App, theme};
 use chrono::Local;
 use ratatui::{
     layout::{Constraint, Rect},
-    style::{Color, Modifier, Style, Stylize},
-    text::{Line, Span},
+    style::{Color, Modifier, Style},
+    text::Span,
     widgets::{Block, BorderType, Borders, Cell, Row, Table},
     Frame,
 };

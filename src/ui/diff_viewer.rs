@@ -12,7 +12,6 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Wrap},
     Frame,
 };
-use similar::{ChangeTag, TextDiff};
 
 pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     // Split horizontally: file list on left, diff on right

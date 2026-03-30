@@ -4,7 +4,7 @@ use crate::ui::{app::{App, Finding}, theme};
 use crate::events::RiskLevel;
 use chrono::Local;
 use ratatui::{
-    layout::{Constraint, Layout, Rect},
+    layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, List, ListItem, Paragraph},

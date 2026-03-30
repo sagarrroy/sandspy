@@ -143,10 +143,10 @@ pub fn build_html_report(metadata: &SessionMetadata, events: &[Event]) -> String
         <!-- Header Minimalist -->
         <header class="flex items-end justify-between border-b-2 border-[#333] pb-6">
             <div>
-                <h1 class="text-2xl font-bold tracking-tight text-white mb-1">
-                    SANDSPY_AUDIT
+                <h1 class="text-2xl font-bold tracking-tight text-white mb-1 uppercase">
+                    SANDSPY
                 </h1>
-                <p class="text-[#888] font-mono text-xs uppercase tracking-widest">Zero-Trust Agent Telemetry</p>
+                <p class="text-[#888] font-mono text-xs uppercase tracking-widest">AGENT TELEMETRY</p>
             </div>
             <div class="text-right">
                 <p class="text-xs text-[#666] font-mono uppercase tracking-widest mb-1">Generated</p>

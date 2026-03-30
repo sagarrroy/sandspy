@@ -3,7 +3,7 @@
 // Renders the same rich post-session summary inside the TUI.
 
 use crate::ui::{app::App, theme};
-use crate::events::{EventKind, NetCategory, RiskLevel};
+use crate::events::RiskLevel;
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},

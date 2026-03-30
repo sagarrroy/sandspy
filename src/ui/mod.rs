@@ -18,7 +18,6 @@ use crate::events::Event;
 use crate::ui::app::{App, Tab};
 use crate::ui::live::SessionStats;
 use anyhow::Result;
-use chrono::Utc;
 use crossterm::{
     event::{self, Event as CEvent, KeyCode, KeyModifiers},
     execute,
