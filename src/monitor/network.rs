@@ -42,9 +42,10 @@ pub async fn run(tx: mpsc::Sender<Event>, pids: PidSet) -> Result<()> {
         };
 
         if tracked_pids.is_empty() {
-            time::sleep(Duration::from_millis(500)).await;
+            time::sleep(Duration::from_millis(50)).await;
             continue;
         }
+
 
         let sockets = match get_sockets_info(
             AddressFamilyFlags::IPV4 | AddressFamilyFlags::IPV6,
@@ -100,7 +101,9 @@ pub async fn run(tx: mpsc::Sender<Event>, pids: PidSet) -> Result<()> {
             }
         }
 
-        time::sleep(Duration::from_millis(500)).await;
+        // 50ms poll — fast enough to catch short-lived HTTPS connections
+        time::sleep(Duration::from_millis(50)).await;
+
     }
 }
 

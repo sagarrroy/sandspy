@@ -229,7 +229,24 @@ async fn handle_watch(command: String, global: GlobalOptions) -> Result<()> {
     let pids_for_environment = pids.clone();
 
     let process_handle = tokio::spawn(async move {
-        monitor::process::spawn_and_monitor(&watch_command, tx_for_process, pids_for_process).await
+        // Find ALL processes with this name and seed the PID set immediately.
+        // This ensures network/env/command monitors are non-empty from tick 0.
+        let command_name = watch_command.split_whitespace().next().unwrap_or(&watch_command);
+        let all_pids = monitor::process::find_all_pids_by_name(command_name);
+
+        if !all_pids.is_empty() {
+            monitor::process::seed_pid_set(&pids_for_process, &all_pids).await;
+            tracing::info!(
+                pids = ?all_pids,
+                name = command_name,
+                "attaching to existing process(es)"
+            );
+            // Monitor the tree from the lowest (root) PID; the rest are already seeded
+            monitor::process::attach_and_monitor(all_pids[0], tx_for_process, pids_for_process).await
+        } else {
+            tracing::info!(command = %watch_command, "spawning and monitoring");
+            monitor::process::spawn_and_monitor(&watch_command, tx_for_process, pids_for_process).await
+        }
     });
     let filesystem_handle = tokio::spawn(async move {
         monitor::filesystem::run(tx_for_filesystem, pids_for_filesystem).await

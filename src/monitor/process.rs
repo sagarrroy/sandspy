@@ -45,6 +45,33 @@ pub fn scan_for_agents() -> Vec<AgentInfo> {
     agents
 }
 
+/// Find ALL PIDs of running processes matching a name (case-insensitive, strips .exe).
+pub fn find_all_pids_by_name(name: &str) -> Vec<u32> {
+    let needle = normalize_process_name(name);
+    let mut system = System::new_all();
+    system.refresh_processes(ProcessesToUpdate::All, true);
+
+    let mut found: Vec<u32> = system
+        .processes()
+        .values()
+        .filter(|p| normalize_process_name(&p.name().to_string_lossy()) == needle)
+        .map(|p| p.pid().as_u32())
+        .collect();
+
+    found.sort();
+    found
+}
+
+/// Immediately seed the shared PID set with a list of known PIDs.
+/// Called before monitors start so they are non-empty from tick 0.
+pub async fn seed_pid_set(pids: &PidSet, initial: &[u32]) {
+    let mut guard = pids.write().await;
+    for pid in initial {
+        guard.insert(*pid);
+    }
+}
+
+
 /// Spawn a command and monitor its process tree.
 pub async fn spawn_and_monitor(
     command: &str,
