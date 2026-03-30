@@ -10,13 +10,20 @@ use std::collections::HashMap;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 
 const MAX_DIFF_BYTES: u64 = 100 * 1024;
+/// How long to wait before emitting a second event for the same path.
+const DEBOUNCE_MS: u64 = 200;
 
-pub async fn run(tx: mpsc::Sender<Event>, _pids: PidSet) -> Result<()> {
-    let cwd = std::env::current_dir().context("failed to get current working directory")?;
-    let mut snapshots = preload_sensitive_snapshots(&cwd);
+
+pub async fn run(tx: mpsc::Sender<Event>, pids: PidSet) -> Result<()> {
+    // Try to resolve the working directory of the monitored process.
+    // Fallback to sandspy's own cwd if unavailable (e.g. no pids yet, or Windows
+    // doesn't expose it for that process).
+    let watch_dir = resolve_watch_dir(&pids).await;
+    let mut snapshots = preload_sensitive_snapshots(&watch_dir);
 
     let (notify_tx, mut notify_rx) = tokio::sync::mpsc::unbounded_channel();
     let mut watcher = notify::recommended_watcher(move |event| {
@@ -25,8 +32,24 @@ pub async fn run(tx: mpsc::Sender<Event>, _pids: PidSet) -> Result<()> {
     .context("failed to create filesystem watcher")?;
 
     watcher
-        .watch(&cwd, RecursiveMode::Recursive)
-        .with_context(|| format!("failed to watch directory: {}", cwd.display()))?;
+        .watch(&watch_dir, RecursiveMode::Recursive)
+        .with_context(|| format!("failed to watch directory: {}", watch_dir.display()))?;
+
+    // Also watch home dir sensitive files (.ssh, .aws, .env in home)
+    if let Some(home) = dirs::home_dir() {
+        for sensitive in &[".ssh", ".aws"] {
+            let p = home.join(sensitive);
+            if p.exists() {
+                let _ = watcher.watch(&p, RecursiveMode::Recursive);
+            }
+        }
+    }
+
+    tracing::debug!(dir = %watch_dir.display(), "filesystem monitor watching");
+
+    // Debounce table: path -> last emit time
+    let mut last_emit: HashMap<PathBuf, Instant> = HashMap::new();
+    let debounce = Duration::from_millis(DEBOUNCE_MS);
 
     while let Some(event_result) = notify_rx.recv().await {
         let event = match event_result {
@@ -37,11 +60,63 @@ pub async fn run(tx: mpsc::Sender<Event>, _pids: PidSet) -> Result<()> {
             }
         };
 
-        handle_notify_event(&event, &tx, &mut snapshots).await?;
+        // Debounce: skip if we emitted for this path recently
+        let now = Instant::now();
+        let paths_to_process: Vec<_> = event
+            .paths
+            .iter()
+            .filter(|p| {
+                match last_emit.get(*p) {
+                    Some(t) if now.duration_since(*t) < debounce => false,
+                    _ => true,
+                }
+            })
+            .cloned()
+            .collect();
+
+        for path in &paths_to_process {
+            last_emit.insert(path.clone(), now);
+        }
+
+        if paths_to_process.is_empty() {
+            continue;
+        }
+
+        // Build a filtered event with only the debounced paths
+        let mut filtered = event.clone();
+        filtered.paths = paths_to_process;
+        handle_notify_event(&filtered, &tx, &mut snapshots).await?;
     }
 
     Ok(())
 }
+
+/// Resolve the best directory to watch for the target process.
+async fn resolve_watch_dir(pids: &PidSet) -> PathBuf {
+    let pid_snapshot = {
+        let guard = pids.read().await;
+        guard.iter().copied().collect::<Vec<_>>()
+    };
+
+    if !pid_snapshot.is_empty() {
+        let mut sys = sysinfo::System::new();
+        sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+
+        for pid in &pid_snapshot {
+            if let Some(proc) = sys.process(sysinfo::Pid::from_u32(*pid)) {
+                if let Some(cwd) = proc.cwd() {
+                    if cwd.exists() {
+                        return cwd.to_path_buf();
+                    }
+                }
+            }
+        }
+    }
+
+    // Fallback: sandspy's own cwd (still useful when watching a local project)
+    std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+}
+
 
 async fn handle_notify_event(
     event: &NotifyEvent,
@@ -210,8 +285,12 @@ where
 fn is_noise_path(path: &Path) -> bool {
     let normalized = path.to_string_lossy().replace('\\', "/").to_lowercase();
 
+    // Block all .git/ internals (index, COMMIT_EDITMSG, lock files, refs, objects, etc.)
+    if normalized.contains("/.git/") {
+        return true;
+    }
+
     [
-        "/.git/objects/",
         "/node_modules/",
         "/target/",
         "/__pycache__/",
