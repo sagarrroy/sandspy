@@ -120,7 +120,15 @@ pub struct Event {
 }
 
 impl Event {
-    pub fn new(kind: EventKind, risk_score: u32) -> Self {
+    pub fn new(kind: EventKind) -> Self {
+        Self {
+            timestamp: Utc::now(),
+            kind,
+            risk_score: 0,
+        }
+    }
+
+    pub fn with_risk(kind: EventKind, risk_score: u32) -> Self {
         Self {
             timestamp: Utc::now(),
             kind,

@@ -31,8 +31,7 @@ impl RiskScorer {
     pub fn level(&self) -> RiskLevel {
         match self.score() {
             0..=20 => RiskLevel::Low,
-            21..=40 => RiskLevel::Medium,    // MODERATE range
-            41..=60 => RiskLevel::Medium,
+            21..=60 => RiskLevel::Medium,
             61..=80 => RiskLevel::High,
             _ => RiskLevel::Critical,
         }
