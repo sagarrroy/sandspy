@@ -196,11 +196,41 @@ fn stat_line(app: &App, label: &'static str, value: usize, warn: bool) -> Line<'
 // ─── Live feed ───────────────────────────────────────────────────────────────
 
 fn render_feed(frame: &mut Frame, area: Rect, app: &App) {
+    let max_lines = area.height.saturating_sub(2) as usize; // subtract block borders
+    let feed_width = area.width.saturating_sub(2) as usize;
+
+    // Collect displayable events once
+    let displayable: Vec<&Event> = app
+        .events
+        .iter()
+        .filter(|e| is_displayable(&e.kind))
+        .collect();
+    let total = displayable.len();
+
+    // scroll_offset=0 → live tail (newest at bottom)
+    // scroll_offset=N → show events ending N items from the bottom
+    let offset = app.scroll_offset.min(total.saturating_sub(max_lines));
+    let is_live = offset == 0;
+
+    // Determine the window: [start..end] into displayable
+    let end = total.saturating_sub(offset);
+    let start = end.saturating_sub(max_lines);
+    let window = &displayable[start..end];
+
+    // Build title with scroll indicator
+    let title = if is_live {
+        " LIVE FEED ".to_string()
+    } else {
+        format!(" LIVE FEED  [PAUSED  ↑{offset}  G=live] ")
+    };
+    let title_style = if is_live {
+        app.style(Style::default().fg(Color::White).add_modifier(Modifier::BOLD))
+    } else {
+        app.style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+    };
+
     let block = Block::default()
-        .title(Span::styled(
-            " LIVE FEED ",
-            app.style(Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
-        ))
+        .title(Span::styled(title, title_style))
         .borders(Borders::ALL)
         .border_type(BorderType::Plain)
         .border_style(app.style(theme::border()));
@@ -208,19 +238,8 @@ fn render_feed(frame: &mut Frame, area: Rect, app: &App) {
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    let max_lines = inner.height as usize;
-    let feed_width = inner.width as usize;
-    // Only show events we can meaningfully display (no ProcessExit, no blanks)
-    let displayable: Vec<&Event> = app
-        .events
+    let items: Vec<ListItem> = window
         .iter()
-        .filter(|e| is_displayable(&e.kind))
-        .collect();
-    let items: Vec<ListItem> = displayable
-        .iter()
-        .rev()
-        .take(max_lines)
-        .rev()
         .map(|e| ListItem::new(format_event_line(e, app.no_color, feed_width)))
         .collect();
 
@@ -244,16 +263,16 @@ fn render_shortcuts(frame: &mut Frame, area: Rect, app: &App) {
         Span::styled("files ", app.style(theme::dim())),
         Span::styled("[n]", app.style(Style::default().fg(Color::Cyan))),
         Span::styled("net ", app.style(theme::dim())),
-        Span::styled("[d]", app.style(Style::default().fg(Color::Cyan))),
-        Span::styled("diffs ", app.style(theme::dim())),
         Span::styled("[s]", app.style(Style::default().fg(Color::Cyan))),
         Span::styled("summary ", app.style(theme::dim())),
         Span::styled("[a]", app.style(Style::default().fg(Color::Cyan))),
         Span::styled("alerts ", app.style(theme::dim())),
-        Span::styled("[esc]", app.style(Style::default().fg(Color::Yellow))),
-        Span::styled("back ", app.style(theme::dim())),
         Span::styled("[j/k]", app.style(Style::default().fg(Color::Cyan))),
         Span::styled("scroll ", app.style(theme::dim())),
+        Span::styled("[G]", app.style(Style::default().fg(Color::Green))),
+        Span::styled("live ", app.style(theme::dim())),
+        Span::styled("[esc]", app.style(Style::default().fg(Color::Yellow))),
+        Span::styled("back ", app.style(theme::dim())),
         Span::styled("[q]", app.style(Style::default().fg(Color::Red))),
         Span::styled("quit ", app.style(theme::dim())),
     ]);

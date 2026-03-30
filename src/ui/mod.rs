@@ -163,11 +163,22 @@ fn handle_key(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
         KeyCode::Tab => app.switch_tab(app.active_tab.next()),
         KeyCode::BackTab => app.switch_tab(app.active_tab.prev()),
 
-        // Scroll
-        KeyCode::Char('j') | KeyCode::Down => app.scroll_down(),
-        KeyCode::Char('k') | KeyCode::Up => app.scroll_up(),
-        KeyCode::Char('g') => app.scroll_top(),
-        KeyCode::Char('G') => app.scroll_bottom(app.events.len(), 20),
+        // Scroll — offset=0 is live tail, higher = further back in time
+        // j/Down = older events (scroll back)
+        KeyCode::Char('j') | KeyCode::Down => app.scroll_up(),   // increases offset = older
+        // k/Up = newer events (scroll forward toward live)
+        KeyCode::Char('k') | KeyCode::Up => app.scroll_down(),   // decreases offset = newer
+        // G = snap to live tail
+        KeyCode::Char('G') => app.scroll_top(),                  // offset=0 = live
+        // g = go to oldest
+        KeyCode::Char('g') => app.scroll_offset = 999_999,       // clamped in renderer
+        // PageUp/PageDown jump 10
+        KeyCode::PageUp => {
+            for _ in 0..10 { app.scroll_up(); }
+        }
+        KeyCode::PageDown => {
+            for _ in 0..10 { app.scroll_down(); }
+        }
 
         _ => {}
     }
