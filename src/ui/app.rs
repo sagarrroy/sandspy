@@ -3,6 +3,8 @@
 // Central state object passed into every Ratatui render call.
 // Updated from the monitor event bus via Arc<Mutex<App>>.
 
+#![allow(dead_code)]
+
 use crate::events::{AgentInfo, Event, EventKind, NetCategory, RiskLevel};
 use chrono::{DateTime, Utc};
 use std::collections::VecDeque;

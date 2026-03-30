@@ -276,6 +276,7 @@ fn truncate(s: &str, max: usize) -> String {
 }
 
 /// Build a SessionData from a list of events accumulated during watch.
+#[allow(dead_code)]
 pub fn session_data_from_stats(
     stats: &SessionStats,
     events: Vec<Event>,

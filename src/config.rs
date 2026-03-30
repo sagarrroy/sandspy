@@ -1,6 +1,7 @@
 // sandspy::config — Configuration management
 
-use anyhow::Result;
+#![allow(dead_code)]
+
 use serde::Deserialize;
 use std::path::PathBuf;
 

@@ -1,5 +1,7 @@
 // sandspy::analysis::profiler — Agent profile loading and matching
 
+#![allow(dead_code)]
+
 use anyhow::{Context, Result};
 use serde::Deserialize;
 use std::collections::HashMap;

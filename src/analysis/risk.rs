@@ -35,6 +35,7 @@ impl RiskScorer {
     }
 
     /// Current risk level.
+    #[allow(dead_code)]
     pub fn level(&self) -> RiskLevel {
         match self.score() {
             0..=20 => RiskLevel::Low,

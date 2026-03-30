@@ -128,6 +128,7 @@ impl Event {
         }
     }
 
+    #[allow(dead_code)]
     pub fn with_risk(kind: EventKind, risk_score: u32) -> Self {
         Self {
             timestamp: Utc::now(),

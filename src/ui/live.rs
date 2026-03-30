@@ -52,6 +52,7 @@ impl SessionStats {
         }
     }
 
+    #[allow(dead_code)]
     pub fn risk_label(&self) -> &'static str {
         match self.risk_score {
             0..=20 => "LOW",

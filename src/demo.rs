@@ -8,7 +8,7 @@ use crate::events::{
     create_event_bus, Event, EventKind, FileCategory, NetCategory, RiskLevel,
 };
 use crate::ui;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use chrono::Utc;
 use colored::*;
 use rand::distributions::WeightedIndex;
@@ -105,7 +105,7 @@ pub async fn run(scan: bool, seed: Option<u64>, _dashboard: bool) -> Result<()> 
         Box::new(StdRng::from_entropy())
     };
 
-    let events = generate_session(&mut rng);
+    let events = generate_session(&mut rng)?;
 
     if scan {
         run_scan_summary(events).await
@@ -174,8 +174,8 @@ async fn run_scan_summary(events: Vec<(Duration, Event)>) -> Result<()> {
 
 // ─── Event generation ────────────────────────────────────────────────────────
 
-fn generate_session(rng: &mut dyn RngCore) -> Vec<(Duration, Event)> {
-    let dist = WeightedIndex::new(WEIGHTS).unwrap();
+fn generate_session(rng: &mut dyn RngCore) -> Result<Vec<(Duration, Event)>> {
+    let dist = WeightedIndex::new(WEIGHTS).context("failed to initialize demo event distribution")?;
     let mut events: Vec<(Duration, Event)> = Vec::new();
 
     // Scatter ~40 events across 25 seconds with weighted timing
@@ -222,7 +222,7 @@ fn generate_session(rng: &mut dyn RngCore) -> Vec<(Duration, Event)> {
     )));
 
     events.sort_by_key(|(at, _)| *at);
-    events
+    Ok(events)
 }
 
 fn random_file_read(rng: &mut dyn RngCore) -> EventKind {
