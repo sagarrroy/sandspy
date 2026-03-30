@@ -80,6 +80,15 @@ pub async fn run(tx: mpsc::Sender<Event>, pids: PidSet) -> Result<()> {
                 continue;
             }
 
+            // Skip loopback/link-local — these are internal IPC, not interesting
+            if remote_addr.starts_with("127.")
+                || remote_addr == "::1"
+                || remote_addr.starts_with("0.0.0.0")
+                || remote_addr.starts_with("fe80:")
+            {
+                continue;
+            }
+
             let key = format!("{remote_addr}:{remote_port}");
             if !seen_connections.insert(key) {
                 continue;
@@ -87,14 +96,20 @@ pub async fn run(tx: mpsc::Sender<Event>, pids: PidSet) -> Result<()> {
 
             let (domain, _ip_category) = resolver::resolve(&remote_addr);
             let category = categorize_target(&remote_addr, domain.as_deref(), &signatures);
-            let event = Event::new(EventKind::NetworkConnection {
+            let risk_score = match category {
+                NetCategory::Unknown => 35,
+                NetCategory::Tracking => 25,
+                NetCategory::Telemetry => 10,
+                NetCategory::ExpectedApi => 0,
+            };
+            let event = Event::with_risk(EventKind::NetworkConnection {
                 remote_addr,
                 remote_port,
                 domain,
                 category,
                 bytes_sent: 0,
                 bytes_recv: 0,
-            });
+            }, risk_score);
 
             if tx.send(event).await.is_err() {
                 return Ok(());

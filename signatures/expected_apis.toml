@@ -1,11 +1,34 @@
 [anthropic]
-domains = ["api.anthropic.com", "claude.anthropic.com"]
+domains = [
+  "api.anthropic.com",
+  "claude.anthropic.com",
+  "*.anthropic.com",
+]
 
 [openai]
-domains = ["api.openai.com", "files.openai.com", "chat.openai.com"]
+domains = [
+  "api.openai.com",
+  "files.openai.com",
+  "chat.openai.com",
+  "*.openai.com",
+]
 
 [google_ai]
-domains = ["generativelanguage.googleapis.com", "aiplatform.googleapis.com", "*.googleapis.com"]
+domains = [
+  "generativelanguage.googleapis.com",
+  "aiplatform.googleapis.com",
+  "*.googleapis.com",
+  "*.googleusercontent.com",
+  "*.google.com",
+]
+
+# Google Cloud infrastructure (Anthropic runs on GCP)
+[google_cloud]
+domains = [
+  "*.google.com",
+  "*.googleusercontent.com",
+  "*.gstatic.com",
+]
 
 [cohere]
 domains = ["api.cohere.ai", "api.cohere.com"]
@@ -15,3 +38,37 @@ domains = ["api.mistral.ai"]
 
 [huggingface]
 domains = ["api-inference.huggingface.co", "huggingface.co", "*.hf.space"]
+
+# Microsoft Azure / GitHub Copilot
+[microsoft]
+domains = [
+  "*.microsoft.com",
+  "*.azure.com",
+  "*.azurewebsites.net",
+  "*.msftconnecttest.com",
+  "*.windows.net",
+]
+
+# GitHub
+[github]
+domains = [
+  "api.github.com",
+  "*.github.com",
+  "*.githubusercontent.com",
+  "raw.githubusercontent.com",
+]
+
+# AWS (used by many AI APIs as backend)
+[aws]
+domains = [
+  "*.amazonaws.com",
+  "*.aws.amazon.com",
+]
+
+# Cursor AI
+[cursor]
+domains = [
+  "*.cursor.sh",
+  "api2.cursor.sh",
+  "*.cursor.so",
+]

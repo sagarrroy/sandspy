@@ -45,22 +45,72 @@ pub fn scan_for_agents() -> Vec<AgentInfo> {
     agents
 }
 
-/// Find ALL PIDs of running processes matching a name (case-insensitive, strips .exe).
+/// Find ALL PIDs related to an agent by name.
+///
+/// Strategy:
+/// 1. Find processes whose name matches (Antigravity → Antigravity.exe)
+/// 2. Discover the install directory from the matched process's exe path
+/// 3. Also capture ANY process whose exe path lives under that install directory
+///    (catches language servers, helpers, backend processes, etc.)
 pub fn find_all_pids_by_name(name: &str) -> Vec<u32> {
     let needle = normalize_process_name(name);
     let mut system = System::new_all();
     system.refresh_processes(ProcessesToUpdate::All, true);
 
-    let mut found: Vec<u32> = system
-        .processes()
-        .values()
-        .filter(|p| normalize_process_name(&p.name().to_string_lossy()) == needle)
-        .map(|p| p.pid().as_u32())
-        .collect();
+    // Step 1: Find PIDs matching by name
+    let mut name_matched: Vec<u32> = Vec::new();
+    let mut install_dirs: Vec<String> = Vec::new();
 
-    found.sort();
-    found
+    for proc in system.processes().values() {
+        let proc_name = normalize_process_name(&proc.name().to_string_lossy());
+        if proc_name == needle {
+            name_matched.push(proc.pid().as_u32());
+
+            // Discover install directory from exe path
+            if let Some(exe) = proc.exe() {
+                // Walk up to find the app root (e.g. D:\Antigravity\)
+                if let Some(parent) = exe.parent() {
+                    let dir = parent.to_string_lossy().to_lowercase();
+                    if !install_dirs.contains(&dir) {
+                        install_dirs.push(dir);
+                    }
+                }
+                // Also check grandparent for nested layouts
+                if let Some(grandparent) = exe.parent().and_then(|p| p.parent()) {
+                    let dir = grandparent.to_string_lossy().to_lowercase();
+                    if !install_dirs.contains(&dir) {
+                        install_dirs.push(dir);
+                    }
+                }
+            }
+        }
+    }
+
+    if install_dirs.is_empty() {
+        name_matched.sort();
+        return name_matched;
+    }
+
+    // Step 2: Find ALL processes whose exe lives under any discovered install dir
+    let mut all_pids: HashSet<u32> = name_matched.into_iter().collect();
+
+    for proc in system.processes().values() {
+        if let Some(exe) = proc.exe() {
+            let exe_str = exe.to_string_lossy().to_lowercase();
+            for dir in &install_dirs {
+                if exe_str.starts_with(dir.as_str()) {
+                    all_pids.insert(proc.pid().as_u32());
+                    break;
+                }
+            }
+        }
+    }
+
+    let mut result: Vec<u32> = all_pids.into_iter().collect();
+    result.sort();
+    result
 }
+
 
 /// Immediately seed the shared PID set with a list of known PIDs.
 /// Called before monitors start so they are non-empty from tick 0.
@@ -81,30 +131,36 @@ pub async fn spawn_and_monitor(
     let mut child = spawn_shell_command(command)
         .with_context(|| format!("failed to spawn watch command: {command}"))?;
     let root_pid = child.id();
-
-    monitor_process_tree(root_pid, tx, pids).await?;
-
+    let initial: Vec<u32> = {
+        let guard = pids.read().await;
+        guard.iter().copied().collect()
+    };
+    monitor_process_tree(root_pid, initial, tx, pids).await?;
     let _ = child.try_wait();
     Ok(())
 }
 
-/// Attach to a running PID and monitor its process tree.
+
+/// Attach to an existing PID and monitor its process tree.
 pub async fn attach_and_monitor(
     pid: u32,
     tx: mpsc::Sender<Event>,
     pids: PidSet,
 ) -> Result<()> {
-    let mut system = System::new_all();
-    system.refresh_processes(ProcessesToUpdate::All, true);
-
-    if !system.processes().contains_key(&Pid::from_u32(pid)) {
-        return Err(anyhow!("cannot attach: pid {pid} was not found"));
-    }
-
-    monitor_process_tree(pid, tx, pids).await
+    let initial: Vec<u32> = {
+        let guard = pids.read().await;
+        guard.iter().copied().collect()
+    };
+    monitor_process_tree(pid, initial, tx, pids).await
 }
 
-async fn monitor_process_tree(root_pid: u32, tx: mpsc::Sender<Event>, pids: PidSet) -> Result<()> {
+async fn monitor_process_tree(
+    root_pid: u32,
+    stable_pids: Vec<u32>, // PIDs to always keep in the set (install-dir seeds)
+    tx: mpsc::Sender<Event>,
+    pids: PidSet,
+) -> Result<()> {
+    let stable_set: HashSet<u32> = stable_pids.into_iter().collect();
     let mut system = System::new_all();
     let mut previous_tree: HashSet<u32> = HashSet::new();
     let mut process_meta: HashMap<u32, ProcessSnapshot> = HashMap::new();
@@ -112,7 +168,16 @@ async fn monitor_process_tree(root_pid: u32, tx: mpsc::Sender<Event>, pids: PidS
     loop {
         system.refresh_processes(ProcessesToUpdate::All, true);
         let process_table = snapshot_processes(system.processes());
-        let current_tree = collect_process_tree(root_pid, &process_table);
+        let mut current_tree = collect_process_tree(root_pid, &process_table);
+
+        // Also collect trees from ALL stable (install-dir) PIDs so their
+        // children (language servers, helpers) are tracked too
+        for &stable_pid in &stable_set {
+            let subtree = collect_process_tree(stable_pid, &process_table);
+            current_tree.extend(subtree);
+        }
+        // Always preserve the stable seed PIDs themselves
+        current_tree.extend(stable_set.iter().copied());
 
         {
             let mut shared = pids.write().await;

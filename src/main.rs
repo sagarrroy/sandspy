@@ -145,15 +145,24 @@ struct GlobalOptions {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize tracing
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive(tracing::Level::INFO.into()),
-        )
-        .init();
-
+    // Initialize tracing — suppress when in dashboard mode to avoid TUI corruption.
+    // Tracing writes to stderr which interleaves with raw-mode terminal rendering.
     let cli = Cli::parse();
+    if cli.dashboard {
+        // No-op subscriber: discard all tracing output
+        tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::ERROR)
+            .with_writer(std::io::sink)
+            .init();
+    } else {
+        tracing_subscriber::fmt()
+            .with_env_filter(
+                tracing_subscriber::EnvFilter::from_default_env()
+                    .add_directive(tracing::Level::INFO.into()),
+            )
+            .init();
+    }
+
     let global = GlobalOptions {
         dashboard: cli.dashboard,
         verbosity: cli.verbosity,
