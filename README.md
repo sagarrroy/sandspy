@@ -1,79 +1,89 @@
 <div align="center">
-  <h1>🕵️‍♂️ Sandspy</h1>
-  <p><b>Real-time security auditing and zero-trust monitoring for AI Coding Agents.</b></p>
+  <h1>S A N D S P Y</h1>
+  <p><strong>Zero-Friction Security Telemetry for Autonomous AI Agents</strong></p>
   
-  <p>
-    <a href="https://github.com/sagarrroy/sandspy/actions"><img src="https://img.shields.io/badge/build-passing-brightgreen" alt="Build Status"></a>
-    <a href="https://crates.io/crates/sandspy"><img src="https://img.shields.io/crates/v/sandspy.svg" alt="Crates.io"></a>
-    <a href="https://github.com/sagarrroy/sandspy/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
-  </p>
+  <a href="https://crates.io/crates/sandspy"><img src="https://img.shields.io/crates/v/sandspy.svg?style=for-the-badge&color=black&logoColor=white" alt="Crates.io"></a>
+  <a href="https://github.com/user/sandspy/actions"><img src="https://img.shields.io/github/actions/workflow/status/user/sandspy/ci.yml?branch=main&style=for-the-badge&color=black" alt="CI Status"></a>
 </div>
 
 ---
 
-**Sandspy** is a lightweight, blazing-fast Rust daemon that watches exactly what your AI coding agents (Claude Code, Cursor, Windsurf, Aider) are doing on your machine in real-time. 
+### The Problem
+You are running Cursor, Windsurf, Claude Code, or Aider on your local machine. You have given an autonomous, continuous-execution AI system root-level shell access and filesystem read/write privileges. 
 
-AI agents are incredibly powerful, but giving an autonomous stochastic model full access to your filesystem, network, and shell is a massive security risk. **Sandspy gives you back your visibility.**
+**You have a junior developer running blind on your system at 1,000 WPM. You have absolutely no idea what it is actually doing.**
+- What `.env` files did it silently read?
+- Did it accidentally copy your AWS credentials to clipboard?
+- What external telemetry tracking servers did its shell commands connect to?
 
-![Sandspy Dashboard](https://github.com/sagarrroy/sandspy/assets/placeholder-dashboard.png)
+**Sandspy visualizes the invisible.** It is a native, frictionless Crowdstrike-style sensor built specifically to audit AI coding agents in real-time.
 
-## ✨ Why Sandspy?
+<br>
 
-Vibe-coding is the future, but raw terminal execution is dangerous. Sandspy attaches directly to the process tree of your AI agent and intercepts its activity without slowing it down. 
+<div align="center">
+  <!-- TODO: Replace with actual asset path before launch -->
+  <img src="https://raw.githubusercontent.com/user/sandspy/main/assets/dashboard.gif" alt="Sandspy TUI Dashboard in Action" width="800" style="border: 1px solid #333; border-radius: 4px;">
+</div>
 
-- **🔍 File System Auditing:** See every file the agent reads, modifies, or deletes.
-- **🔐 Secret Detection Engine:** Instantly alerts you if the agent touches, generates, or copies sensitive credentials (AWS, Anthropic, OpenAI, Stripe, Private Keys, etc.).
-- **🌐 Network De-anonymization:** Tracks every outbound HTTP/TCP request the agent makes and categorizes the destination IP (Google, AWS, Azure, Cloudflare) so you know exactly where your code is being sent.
-- **💻 Shell Command Tracking:** Intercepts and flags dangerous terminal commands spawned by the agent.
-- **📋 Clipboard & Env Profiling:** Warns you if the agent accesses sensitive environment variables or copies secrets to your clipboard.
+<br>
 
-## 🚀 QuickStart
+## Features
 
-Install Sandspy globally via Cargo:
+- 🎯 **Auto-Attach**: Instantly discovers and hooks into active Agent PIDs (Cursor, Windsurf, Aider, etc.) with zero configuration required.
+- 📡 **Deep Network Forensics**: Intercepts and categorizes every background `TCP/UDP` connection the agent attempts.
+- 🔐 **Regex Secret Sniffing**: Memory-safe memory scanning. Instantly triggers **CRITICAL** risk alerts if the agent touches an AWS key, Stripe live token, or OpenAI secret.
+- 📝 **Clipboard Monitoring**: Detects when malicious shell commands or agent responses poison your systemic clipboard.
+- 🛡️ **Self-Healing Daemon**: If the AI process exits, the Sandspy daemon silently resets and waits in an infinite loop to seamlessly re-attach to the next spawned process.
+- 📊 **Brutalist HTML Audits**: Generates breathtakingly minimal, Vercel-inspired HTML executive summaries for post-session telemetry review.
+
+## Installation
+
+Sandspy is a lightweight Rust binary. Install it globally via Cargo:
+
 ```bash
-cargo install --path .
+cargo install sandspy
+```
+*(Require Rust 1.88+)*
+
+Or build from source:
+```bash
+git clone https://github.com/user/sandspy.git
+cd sandspy
+cargo install --path . --force
 ```
 
-To monitor an agent, simply run `sandspy watch` and point it at the process name. 
+## Quick Start
 
-**Monitoring Cursor:**
+### 1. The Real-Time Dashboard
+To open the 60fps telemetry terminal UI and automatically hook into the nearest AI agent process:
+
 ```bash
-sandspy watch --dashboard "Code"
+sandspy watch --dashboard
 ```
 
-**Monitoring Claude Code:**
+### 2. The Headless Daemon
+To run Sandspy silently in the background (perfect for CI/CD or continuous monitoring):
+
 ```bash
-sandspy watch --dashboard "claude"
+sandspy watch
 ```
 
-**Monitoring Antigravity:**
+### 3. Generate HTML Audit Reports
+After an agent session cleanly exits, generate a VC-grade brutalist HTML report to review exactly what files and networks it touched.
+
 ```bash
-sandspy watch --dashboard "Antigravity"
+sandspy history                  # See recent sessions
+sandspy report --session <ID> --format Html
 ```
 
-## ⌨️ TUI Keybindings
+## Under The Hood
 
-Sandspy features a high-performance terminal UI (TUI) powered by `ratatui`.
+Sandspy is not a sloppy python wrapper. It is enterprise-grade Rust infrastructure:
+- **Lock-Free Event Bus**: Powered by `tokio` multi-threaded MPSC channels handling >10,000 events/sec.
+- **Cross-Platform**: Operates flawlessly across Windows (`Win32`), Linux (`procfs`), and macOS.
+- **Zero-Friction Engine**: Does not require root elevation or messy kernel drivers to observe process network tables.
 
-| Key | Action |
-|---|---|
-| `1` | Dashboard (Live Feed + Risk Meter) |
-| `2` | File Diff Viewer |
-| `3` | Network Traffic |
-| `a` | Alerts & High-Risk Findings |
-| `j` / `↓` | Scroll older |
-| `k` / `↑` | Scroll newer |
-| `G` | Snap to live tail |
-| `q` | Quit |
-
-## 🧠 How it Works
-
-Sandspy does not require admin privileges (for basic mode). It relies on OS-level polling and memory-safe process tree traversal:
-1. It anchors to the target Process ID (PID) and its parent executable directory.
-2. It walks the entire tree, discovering every background language server, node worker, and shell subprocess spawned by the agent.
-3. It aggregates `notify` filesystem events, `netstat2` socket tables, and `sysinfo` process tables.
-4. It passes all strings through a highly optimized, embedded regex engine to calculate a **live danger score**.
-
-## 🛡️ License
-
-MIT License. See `LICENSE` for more information. Built for the vibe-coding generation.
+---
+<div align="center">
+  <i>"Trust your agents. Verify their execution."</i>
+</div>

@@ -1,0 +1,63 @@
+name: Release Pipelines
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build_release:
+    name: Build Release Binary
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            asset_name: sandspy-linux-amd64
+            artifact_name: sandspy
+          - os: windows-latest
+            asset_name: sandspy-windows-amd64.exe
+            artifact_name: sandspy.exe
+          - os: macos-latest
+            asset_name: sandspy-macos-arm64
+            artifact_name: sandspy
+            
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: x86_64-unknown-linux-gnu, x86_64-pc-windows-msvc, aarch64-apple-darwin
+        
+    - name: Build Global Binary
+      run: cargo build --release --locked
+
+    - name: Upload Build Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.asset_name }}
+        path: target/release/${{ matrix.artifact_name }}
+
+  github_release:
+    name: Publish to GitHub Releases
+    needs: build_release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
