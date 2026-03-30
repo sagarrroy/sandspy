@@ -255,17 +255,7 @@ async fn handle_watch(command: String, global: GlobalOptions) -> Result<()> {
     };
     let session_start_utc = chrono::Utc::now();
 
-    // Collected events for the summary
-    let collected_events = Arc::new(RwLock::new(Vec::<events::Event>::new()));
-    let collected_for_printer = collected_events.clone();
-    let printer_tx = tx.clone();
-    let printer_state = process_state.clone();
-
     let printer_handle = tokio::spawn(async move {
-        // Run the live renderer; it also does risk scoring and alert injection
-        // We collect events in parallel via the old path for the summary.
-        // Simpler: run the beautified live renderer and track state there.
-        let _ = (printer_state, printer_tx, collected_for_printer); // keep alive
         ui::live::run(&mut rx, &agent_label, verbosity_level).await
     });
 
@@ -291,16 +281,29 @@ async fn handle_watch(command: String, global: GlobalOptions) -> Result<()> {
     drop(tx);
     let live_stats = printer_handle.await?;
 
+    let duration_secs = live_stats.start.elapsed().as_secs();
+    let agent_pid = seen_pids.iter().min().copied();
+    let metadata = history::SessionMetadata {
+        agent_name: command.clone(),
+        pid: agent_pid,
+        duration: duration_secs,
+        risk_score: live_stats.risk_score,
+        event_count: live_stats.events.len(),
+        timestamp: session_start_utc,
+    };
+    let session_id = history::persist_session(&metadata, &live_stats.events)?;
+
     // Print post-session summary
     let summary_data = ui::summary::SessionData {
         agent_name: command.clone(),
-        agent_pid: None,
+        agent_pid,
         start: session_start_utc,
         end: chrono::Utc::now(),
-        events: collected_events.read().await.clone(),
+        events: live_stats.events.clone(),
         risk_score: live_stats.risk_score,
     };
     ui::summary::print_summary(&summary_data);
+    println!("saved session: {}", session_id);
 
     Ok(())
 }

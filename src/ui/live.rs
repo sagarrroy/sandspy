@@ -14,6 +14,7 @@ pub struct SessionStats {
     pub event_count: usize,
     pub risk_score: u32,
     pub start: Instant,
+    pub events: Vec<Event>,
     pub files_read: usize,
     pub files_written: usize,
     pub net_connections: usize,
@@ -30,6 +31,7 @@ impl SessionStats {
             event_count: 0,
             risk_score: 0,
             start: Instant::now(),
+            events: Vec::new(),
             files_read: 0,
             files_written: 0,
             net_connections: 0,
@@ -94,6 +96,8 @@ pub async fn run(
     let mut last_bar = Instant::now();
 
     while let Some(event) = rx.recv().await {
+        stats.events.push(event.clone());
+
         // Update stats
         stats.event_count += 1;
         stats.risk_score = stats.risk_score.max(event.risk_score);

@@ -4,12 +4,12 @@
 // All communication flows through a single tokio mpsc channel.
 
 use chrono::{DateTime, Utc};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::sync::mpsc;
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum EventKind {
     // Filesystem
     FileRead {
@@ -79,7 +79,7 @@ pub enum EventKind {
     },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum RiskLevel {
     Low,
     Medium,
@@ -87,7 +87,7 @@ pub enum RiskLevel {
     Critical,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FileCategory {
     Source,
     Config,
@@ -97,7 +97,7 @@ pub enum FileCategory {
     Documentation,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NetCategory {
     ExpectedApi,
     Telemetry,
@@ -105,14 +105,14 @@ pub enum NetCategory {
     Unknown,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SecretSource {
     File,
     EnvVar,
     Clipboard,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Event {
     pub timestamp: DateTime<Utc>,
     pub kind: EventKind,
