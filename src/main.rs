@@ -488,9 +488,9 @@ async fn handle_report(
         }
         ReportFormat::Html => {
             let output = report::html::build_html_report(&metadata, &events);
-            let path = format!("sandspy_report_{}_{}.html", metadata.agent_name, metadata.timestamp.format("%Y%m%d_%H%M%S"));
+            let path = std::env::current_dir()?.join(format!("sandspy_report_{}_{}.html", metadata.agent_name, metadata.timestamp.format("%Y%m%d_%H%M%S")));
             std::fs::write(&path, output)?;
-            println!("HTML Report saved to: {}", path);
+            println!("HTML Report saved to: {}", path.display());
         }
     }
 
