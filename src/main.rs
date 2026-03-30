@@ -84,7 +84,7 @@ enum Commands {
         #[arg(long)]
         session: Option<String>,
         /// Output format
-        #[arg(long, value_enum, default_value_t = ReportFormat::Text)]
+        #[arg(long, value_enum, default_value_t = ReportFormat::Markdown)]
         format: ReportFormat,
     },
     /// Browse session history
@@ -129,7 +129,7 @@ enum Verbosity {
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
 enum ReportFormat {
-    Text,
+    Markdown,
     Json,
 }
 
@@ -403,7 +403,19 @@ async fn handle_report(
         "report mode"
     );
 
-    println!("report mode not yet implemented (Sprint 2+)");
+    let session_id = session.ok_or_else(|| anyhow::anyhow!("--session is required for report"))?;
+    let (metadata, events) = report::load_session(&session_id)?;
+
+    match format {
+        ReportFormat::Json => {
+            let output = report::build_json_report(metadata, events);
+            println!("{}", serde_json::to_string_pretty(&output)?);
+        }
+        ReportFormat::Markdown => {
+            report::print_markdown_summary(metadata, events);
+        }
+    }
+
     Ok(())
 }
 
