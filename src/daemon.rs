@@ -1,5 +1,6 @@
 // sandspy::daemon — Background daemon mode
 
+use crate::alerts;
 use anyhow::{Context, Result};
 use chrono::Utc;
 use std::collections::{BTreeMap, HashSet};
@@ -56,6 +57,7 @@ pub async fn start() -> Result<()> {
                     process_name, process_pid, watch_pid
                 ),
             )?;
+            let _ = alerts::notify("sandspy", &format!("agent detected: {}", process_name));
         }
 
         let alive_pids = system

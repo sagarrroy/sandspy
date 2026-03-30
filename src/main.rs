@@ -323,6 +323,10 @@ async fn handle_watch(command: String, global: GlobalOptions) -> Result<()> {
     };
     ui::summary::print_summary(&summary_data);
     println!("  session saved: {}", session_id);
+    let _ = alerts::notify(
+        "sandspy",
+        &format!("session complete — risk {}", live_stats.risk_score),
+    );
 
     Ok(())
 }

@@ -1,10 +1,16 @@
 // sandspy::alerts — Desktop notification system
-// TODO: Sprint 4
 
 use anyhow::Result;
+use notify_rust::Notification;
 
-pub fn notify(_title: &str, _body: &str) -> Result<()> {
-    // Uses notify-rust crate
-    // Gracefully fails if no desktop environment
+pub fn notify(title: &str, body: &str) -> Result<()> {
+    (|| -> Result<()> {
+        Notification::new().summary(title).body(body).show()?;
+        Ok(())
+    })()
+    .unwrap_or_else(|e| {
+        tracing::warn!("notification failed: {e}");
+    });
+
     Ok(())
 }
