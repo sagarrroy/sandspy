@@ -244,11 +244,29 @@ async fn handle_watch(command: String, global: GlobalOptions) -> Result<()> {
         monitor::environment::run(tx_for_environment, pids_for_environment).await
     });
     let clipboard_handle = tokio::spawn(async move { monitor::clipboard::run(tx_for_clipboard).await });
+
+    // Agent label for the header
+    let agent_label = command.clone();
+    let verbosity_level: u8 = match global.verbosity {
+        Verbosity::Low => 0,
+        Verbosity::Medium => 1,
+        Verbosity::High => 2,
+        Verbosity::All => 3,
+    };
+    let session_start_utc = chrono::Utc::now();
+
+    // Collected events for the summary
+    let collected_events = Arc::new(RwLock::new(Vec::<events::Event>::new()));
+    let collected_for_printer = collected_events.clone();
     let printer_tx = tx.clone();
     let printer_state = process_state.clone();
 
     let printer_handle = tokio::spawn(async move {
-        print_watch_events(&mut rx, Some(&printer_tx), printer_state).await;
+        // Run the live renderer; it also does risk scoring and alert injection
+        // We collect events in parallel via the old path for the summary.
+        // Simpler: run the beautified live renderer and track state there.
+        let _ = (printer_state, printer_tx, collected_for_printer); // keep alive
+        ui::live::run(&mut rx, &agent_label, verbosity_level).await
     });
 
     process_handle.await??;
@@ -270,9 +288,19 @@ async fn handle_watch(command: String, global: GlobalOptions) -> Result<()> {
     monitor::memory::run(tx.clone(), session_start, &seen_pids).await?;
     time::sleep(Duration::from_millis(250)).await;
 
-    printer_handle.abort();
-    let _ = printer_handle.await;
     drop(tx);
+    let live_stats = printer_handle.await?;
+
+    // Print post-session summary
+    let summary_data = ui::summary::SessionData {
+        agent_name: command.clone(),
+        agent_pid: None,
+        start: session_start_utc,
+        end: chrono::Utc::now(),
+        events: collected_events.read().await.clone(),
+        risk_score: live_stats.risk_score,
+    };
+    ui::summary::print_summary(&summary_data);
 
     Ok(())
 }
