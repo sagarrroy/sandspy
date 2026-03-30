@@ -104,8 +104,9 @@ pub fn is_placeholder_value(value: &str) -> bool {
     // Common placeholder words
     let placeholders = [
         "placeholder", "changeme", "replace_me", "insert_here",
-        "xxxxxxxx", "aaaaaaaa", "12345678", "abcdefgh",
-        "testtest", "dummy", "fake", "sample", "demo",
+        "xxxxxxxx", "aaaaaaaa", "12345678", "abcdefgh", "1234567890",
+        "testtest", "dummy", "fake", "sample", "demo", "password",
+        "user:pass", "user:password", "MIIEowIBAAKCAQEA",
     ];
     if placeholders.iter().any(|p| lower.contains(p)) {
         return true;
