@@ -68,17 +68,20 @@ pub fn find_all_pids_by_name(name: &str) -> Vec<u32> {
 
             // Discover install directory from exe path
             if let Some(exe) = proc.exe() {
-                // Walk up to find the app root (e.g. D:\Antigravity\)
+                // Focus strictly on the exact application folder (e.g. C:\Program Files\Microsoft VS Code\)
+                // This captures bundled helpers/language servers that live in subdirectories.
                 if let Some(parent) = exe.parent() {
                     let dir = parent.to_string_lossy().to_lowercase();
-                    if !install_dirs.contains(&dir) {
-                        install_dirs.push(dir);
-                    }
-                }
-                // Also check grandparent for nested layouts
-                if let Some(grandparent) = exe.parent().and_then(|p| p.parent()) {
-                    let dir = grandparent.to_string_lossy().to_lowercase();
-                    if !install_dirs.contains(&dir) {
+                    
+                    // Safety: Never use a global OS directory as an install root
+                    let is_global = dir == "c:\\windows" 
+                        || dir == "c:\\windows\\system32" 
+                        || dir == "c:\\program files" 
+                        || dir == "c:\\program files (x86)"
+                        || dir.ends_with("\\bin") // typical for global CLI tools
+                        || dir.ends_with("\\usr\\bin");
+
+                    if !is_global && !install_dirs.contains(&dir) {
                         install_dirs.push(dir);
                     }
                 }
