@@ -98,7 +98,7 @@ pub async fn run_dashboard(
         event_count: state.events.len(),
         risk_score: state.risk.score,
         start: std::time::Instant::now(),
-        events: vec![],
+        events: state.events.iter().cloned().collect(),
         files_read: state.stats.files_read,
         files_written: state.stats.files_written,
         net_connections: state.stats.net_connections,

@@ -300,7 +300,9 @@ async fn handle_watch(command: String, global: GlobalOptions) -> Result<()> {
         printer_handle.await?
     };
 
-    let duration_secs = live_stats.start.elapsed().as_secs();
+    let duration_secs = (chrono::Utc::now() - session_start_utc)
+        .num_seconds()
+        .max(0) as u64;
     let agent_pid = agent_pid_hint;
     let metadata = history::SessionMetadata {
         agent_name: command.clone(),
@@ -310,7 +312,7 @@ async fn handle_watch(command: String, global: GlobalOptions) -> Result<()> {
         event_count: live_stats.event_count,
         timestamp: session_start_utc,
     };
-    let session_id = history::persist_session(&metadata, &[])?;
+    let session_id = history::persist_session(&metadata, &live_stats.events)?;
 
     // Print post-session summary
     let summary_data = ui::summary::SessionData {
@@ -318,7 +320,7 @@ async fn handle_watch(command: String, global: GlobalOptions) -> Result<()> {
         agent_pid,
         start: session_start_utc,
         end: chrono::Utc::now(),
-        events: vec![],
+        events: live_stats.events.clone(),
         risk_score: live_stats.risk_score,
     };
     ui::summary::print_summary(&summary_data);
