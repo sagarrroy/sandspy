@@ -1,6 +1,7 @@
 // sandspy::monitor::network — Network connection tracking
 
 use crate::events::{Event, EventKind, NetCategory};
+use crate::analysis::resolver;
 use crate::monitor::process::PidSet;
 use anyhow::{Context, Result};
 use netstat2::{
@@ -83,11 +84,12 @@ pub async fn run(tx: mpsc::Sender<Event>, pids: PidSet) -> Result<()> {
                 continue;
             }
 
-            let category = categorize_target(&remote_addr, &signatures);
+            let (domain, _ip_category) = resolver::resolve(&remote_addr);
+            let category = categorize_target(&remote_addr, domain.as_deref(), &signatures);
             let event = Event::new(EventKind::NetworkConnection {
                 remote_addr,
                 remote_port,
-                domain: None,
+                domain,
                 category,
                 bytes_sent: 0,
                 bytes_recv: 0,
@@ -135,7 +137,30 @@ fn load_signature_map(path: &Path) -> Result<HashMap<String, SignatureEntry>> {
     Ok(parsed)
 }
 
-fn categorize_target(target: &str, signatures: &SignatureDb) -> NetCategory {
+fn categorize_target(target: &str, domain: Option<&str>, signatures: &SignatureDb) -> NetCategory {
+    if let Some(domain_name) = domain {
+        if signatures
+            .expected_domains
+            .iter()
+            .any(|pattern| domain_matches(pattern, domain_name))
+        {
+            return NetCategory::ExpectedApi;
+        }
+
+        for tracker in &signatures.trackers {
+            if tracker
+                .domains
+                .iter()
+                .any(|pattern| domain_matches(pattern, domain_name))
+            {
+                return match tracker.category.as_deref() {
+                    Some("tracking") => NetCategory::Tracking,
+                    _ => NetCategory::Telemetry,
+                };
+            }
+        }
+    }
+
     if signatures
         .expected_domains
         .iter()

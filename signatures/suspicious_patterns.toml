@@ -4,15 +4,15 @@ regex = 'AKIA[0-9A-Z]{16}'
 
 [[patterns]]
 name = "Generic API Key"
-regex = '(?i)(api[_-]?key|apikey)\s*[=:]\s*["'']?[a-zA-Z0-9_\-]{20,}'
+regex = '(?i)(api[_-]?key|apikey|token|secret)\s*[=:]\s*["'']?[a-zA-Z0-9_\-]{16,}'
 
 [[patterns]]
 name = "Private Key Header"
-regex = '-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----'
+regex = '-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----'
 
 [[patterns]]
 name = "Connection String"
-regex = '(?i)(postgres|mysql|mongodb|redis)://[^\s]+'
+regex = '(?i)((postgres(ql)?|mysql|mongodb|redis|amqp|mssql)://[^\s]+|(server|host|data source)\s*=\s*[^;\n]+;\s*(user id|uid|password|pwd)\s*=\s*[^;\n]+)'
 
 [[patterns]]
 name = "GitHub Token"

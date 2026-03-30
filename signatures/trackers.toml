@@ -1,27 +1,27 @@
 [microsoft_telemetry]
-domains = ["telemetry.microsoft.com", "vortex.data.microsoft.com"]
+domains = ["telemetry.microsoft.com", "vortex.data.microsoft.com", "settings-win.data.microsoft.com"]
 category = "telemetry"
 
 [cursor_telemetry]
-domains = ["telemetry.cursor.sh"]
+domains = ["telemetry.cursor.sh", "api2.cursor.sh", "api3.cursor.sh", "api4.cursor.sh", "api5.cursor.sh"]
 category = "telemetry"
 
 [statsig]
-domains = ["api.statsig.com", "events.statsig.com", "featuregates.org"]
+domains = ["api.statsig.com", "events.statsig.com", "featuregates.org", "*.statsigapi.net"]
 category = "telemetry"
 
 [sentry]
-domains = ["sentry.io", "o1.ingest.sentry.io", "o2.ingest.sentry.io"]
+domains = ["sentry.io", "o1.ingest.sentry.io", "o2.ingest.sentry.io", "*.ingest.sentry.io"]
 category = "telemetry"
 
 [amplitude]
-domains = ["api.amplitude.com", "api2.amplitude.com"]
+domains = ["api.amplitude.com", "api2.amplitude.com", "region1.api.amplitude.com"]
 category = "tracking"
 
 [mixpanel]
-domains = ["api.mixpanel.com", "data.mixpanel.com"]
+domains = ["api.mixpanel.com", "data.mixpanel.com", "api-eu.mixpanel.com"]
 category = "tracking"
 
 [segment]
-domains = ["api.segment.io", "cdn.segment.com"]
+domains = ["api.segment.io", "cdn.segment.com", "events.segment.io"]
 category = "tracking"
