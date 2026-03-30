@@ -15,13 +15,13 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let block = Block::default()
         .title(Span::styled(
             " ALERTS ",
-            Style::default()
+            app.style(Style::default()
                 .fg(Color::Red)
-                .add_modifier(Modifier::BOLD),
+                .add_modifier(Modifier::BOLD)),
         ))
         .borders(Borders::ALL)
         .border_type(BorderType::Plain)
-        .border_style(theme::border());
+        .border_style(app.style(theme::border()));
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -29,7 +29,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     if app.findings.is_empty() {
         let msg = Paragraph::new(Line::from(Span::styled(
             "  no alerts — everything looks clean",
-            theme::dim(),
+            app.style(theme::dim()),
         )));
         frame.render_widget(msg, inner);
         return;
@@ -47,14 +47,14 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         .rev() // newest first
         .skip(offset)
         .take(visible_height)
-        .map(|f| finding_item(f))
+        .map(|f| finding_item(f, app))
         .collect();
 
     let list = List::new(items);
     frame.render_widget(list, inner);
 }
 
-fn finding_item(f: &Finding) -> ListItem<'static> {
+fn finding_item(f: &Finding, app: &App) -> ListItem<'static> {
     let ts = f
         .timestamp
         .with_timezone(&Local)
@@ -69,10 +69,10 @@ fn finding_item(f: &Finding) -> ListItem<'static> {
     };
 
     ListItem::new(Line::from(vec![
-        Span::styled(ts, theme::dim()),
+        Span::styled(ts, app.style(theme::dim())),
         Span::raw("  "),
-        Span::styled(sev_label, sev_style),
+        Span::styled(sev_label, app.style(sev_style)),
         Span::raw("  "),
-        Span::styled(f.message.clone(), Style::default().fg(Color::White)),
+        Span::styled(f.message.clone(), app.style(Style::default().fg(Color::White))),
     ]))
 }

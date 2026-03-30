@@ -16,13 +16,13 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let block = Block::default()
         .title(Span::styled(
             " SUMMARY ",
-            Style::default()
+            app.style(Style::default()
                 .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
+                .add_modifier(Modifier::BOLD)),
         ))
         .borders(Borders::ALL)
         .border_type(BorderType::Plain)
-        .border_style(theme::border());
+        .border_style(app.style(theme::border()));
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -53,35 +53,35 @@ fn build_summary_lines(app: &App) -> Vec<Line<'static>> {
 
     let mut lines = vec![
         Line::from(""),
-        section_title("session summary"),
+        section_title("session summary", app),
         Line::from(""),
-        kv_line("agent   ", &agent_name),
-        kv_line("elapsed ", &elapsed),
+        kv_line("agent   ", &agent_name, app),
+        kv_line("elapsed ", &elapsed, app),
         Line::from(""),
-        section_title("activity"),
+        section_title("activity", app),
         Line::from(""),
-        kv_line("files   ", &format!("{} read  {} written  {} deleted", s.files_read, s.files_written, s.files_deleted)),
-        kv_line("network ", &format!("{} connections  ({} unknown)", s.net_connections, s.net_unknown)),
-        kv_line("commands", &format!("{} executed  ({} dangerous)", s.commands_total, s.commands_dangerous)),
-        kv_line("secrets ", &format!("{} accessed", s.secrets_accessed)),
-        kv_line("clipboard", &format!("{} reads", s.clipboard_reads)),
+        kv_line("files   ", &format!("{} read  {} written  {} deleted", s.files_read, s.files_written, s.files_deleted), app),
+        kv_line("network ", &format!("{} connections  ({} unknown)", s.net_connections, s.net_unknown), app),
+        kv_line("commands", &format!("{} executed  ({} dangerous)", s.commands_total, s.commands_dangerous), app),
+        kv_line("secrets ", &format!("{} accessed", s.secrets_accessed), app),
+        kv_line("clipboard", &format!("{} reads", s.clipboard_reads), app),
         Line::from(""),
-        section_title("risk"),
+        section_title("risk", app),
         Line::from(""),
         Line::from(vec![
             Span::raw("  "),
-            Span::styled(bar_str, theme::risk_gauge(score)),
+            Span::styled(bar_str, app.style(theme::risk_gauge(score))),
         ]),
         Line::from(vec![
             Span::raw("  "),
-            Span::styled(risk_str, theme::risk_label(score)),
+            Span::styled(risk_str, app.style(theme::risk_label(score))),
         ]),
         Line::from(""),
     ];
 
     // Findings
     if !app.findings.is_empty() {
-        lines.push(section_title("findings"));
+        lines.push(section_title("findings", app));
         lines.push(Line::from(""));
         for f in app.findings.iter().rev().take(20) {
             let (sev, sev_style) = match f.severity {
@@ -92,30 +92,30 @@ fn build_summary_lines(app: &App) -> Vec<Line<'static>> {
             };
             lines.push(Line::from(vec![
                 Span::raw("  "),
-                Span::styled(sev, sev_style),
+                Span::styled(sev, app.style(sev_style)),
                 Span::raw("  "),
-                Span::styled(f.message.clone(), Style::default().fg(Color::White)),
+                Span::styled(f.message.clone(), app.style(Style::default().fg(Color::White))),
             ]));
         }
     } else {
-        lines.push(Line::from(Span::styled("  no notable findings", theme::dim())));
+        lines.push(Line::from(Span::styled("  no notable findings", app.style(theme::dim()))));
     }
 
     lines
 }
 
-fn section_title(s: &'static str) -> Line<'static> {
+fn section_title(s: &'static str, app: &App) -> Line<'static> {
     Line::from(Span::styled(
         format!("  {}", s.to_uppercase()),
-        Style::default()
+        app.style(Style::default()
             .fg(Color::Yellow)
-            .add_modifier(Modifier::BOLD),
+            .add_modifier(Modifier::BOLD)),
     ))
 }
 
-fn kv_line(key: &str, value: &str) -> Line<'static> {
+fn kv_line(key: &str, value: &str, app: &App) -> Line<'static> {
     Line::from(vec![
-        Span::styled(format!("  {:<10}", key), Style::default().add_modifier(Modifier::DIM)),
-        Span::styled(value.to_string(), Style::default().fg(Color::White)),
+        Span::styled(format!("  {:<10}", key), app.style(Style::default().add_modifier(Modifier::DIM))),
+        Span::styled(value.to_string(), app.style(Style::default().fg(Color::White))),
     ])
 }

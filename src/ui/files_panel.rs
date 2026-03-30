@@ -15,22 +15,22 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let block = Block::default()
         .title(Span::styled(
             " FILES ",
-            Style::default()
+            app.style(Style::default()
                 .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
+                .add_modifier(Modifier::BOLD)),
         ))
         .borders(Borders::ALL)
         .border_type(BorderType::Plain)
-        .border_style(theme::border());
+        .border_style(app.style(theme::border()));
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
     let header = Row::new(vec![
-        Cell::from("Time").style(theme::header()),
-        Cell::from("Type").style(theme::header()),
-        Cell::from("Path").style(theme::header()),
-        Cell::from("Classification").style(theme::header()),
+        Cell::from("Time").style(app.style(theme::header())),
+        Cell::from("Type").style(app.style(theme::header())),
+        Cell::from("Path").style(app.style(theme::header())),
+        Cell::from("Classification").style(app.style(theme::header())),
     ]);
 
     let file_events: Vec<&Event> = app
@@ -56,7 +56,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         .iter()
         .skip(offset)
         .take(visible_height)
-        .map(|e| file_event_row(e))
+        .map(|e| file_event_row(e, app))
         .collect();
 
     let widths = [
@@ -73,7 +73,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     frame.render_widget(table, inner);
 }
 
-fn file_event_row(event: &Event) -> Row<'static> {
+fn file_event_row(event: &Event, app: &App) -> Row<'static> {
     let ts = event
         .timestamp
         .with_timezone(&Local)
@@ -88,23 +88,23 @@ fn file_event_row(event: &Event) -> Row<'static> {
                 ("ok       ", theme::label_ok())
             };
             Row::new(vec![
-                Cell::from(ts).style(theme::dim()),
-                Cell::from("READ").style(theme::tag_read()),
-                Cell::from(path.display().to_string()).style(Style::default().fg(Color::White)),
-                Cell::from(label).style(label_style),
+                Cell::from(ts).style(app.style(theme::dim())),
+                Cell::from("READ").style(app.style(theme::tag_read())),
+                Cell::from(path.display().to_string()).style(app.style(Style::default().fg(Color::White))),
+                Cell::from(label).style(app.style(label_style)),
             ])
         }
         EventKind::FileWrite { path, diff_summary } => Row::new(vec![
-            Cell::from(ts).style(theme::dim()),
-            Cell::from("WRITE").style(theme::tag_write()),
-            Cell::from(path.display().to_string()).style(Style::default().fg(Color::White)),
-            Cell::from(diff_summary.clone().unwrap_or_default()).style(theme::tag_write()),
+            Cell::from(ts).style(app.style(theme::dim())),
+            Cell::from("WRITE").style(app.style(theme::tag_write())),
+            Cell::from(path.display().to_string()).style(app.style(Style::default().fg(Color::White))),
+            Cell::from(diff_summary.clone().unwrap_or_default()).style(app.style(theme::tag_write())),
         ]),
         EventKind::FileDelete { path } => Row::new(vec![
-            Cell::from(ts).style(theme::dim()),
-            Cell::from("DEL").style(theme::tag_delete()),
-            Cell::from(path.display().to_string()).style(theme::tag_delete()),
-            Cell::from("deleted").style(theme::label_high()),
+            Cell::from(ts).style(app.style(theme::dim())),
+            Cell::from("DEL").style(app.style(theme::tag_delete())),
+            Cell::from(path.display().to_string()).style(app.style(theme::tag_delete())),
+            Cell::from("deleted").style(app.style(theme::label_high())),
         ]),
         _ => Row::new(vec![Cell::from("")]),
     }

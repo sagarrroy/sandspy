@@ -15,23 +15,23 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let block = Block::default()
         .title(Span::styled(
             " NETWORK ",
-            Style::default()
+            app.style(Style::default()
                 .fg(Color::Blue)
-                .add_modifier(Modifier::BOLD),
+                .add_modifier(Modifier::BOLD)),
         ))
         .borders(Borders::ALL)
         .border_type(BorderType::Plain)
-        .border_style(theme::border());
+        .border_style(app.style(theme::border()));
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
     let header = Row::new(vec![
-        Cell::from("Time").style(theme::header()),
-        Cell::from("Domain / IP").style(theme::header()),
-        Cell::from("Port").style(theme::header()),
-        Cell::from("Category").style(theme::header()),
-        Cell::from("Bytes").style(theme::header()),
+        Cell::from("Time").style(app.style(theme::header())),
+        Cell::from("Domain / IP").style(app.style(theme::header())),
+        Cell::from("Port").style(app.style(theme::header())),
+        Cell::from("Category").style(app.style(theme::header())),
+        Cell::from("Bytes").style(app.style(theme::header())),
     ]);
 
     let net_events: Vec<&Event> = app
@@ -50,7 +50,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         .iter()
         .skip(offset)
         .take(visible_height)
-        .map(|e| net_event_row(e))
+        .map(|e| net_event_row(e, app))
         .collect();
 
     let widths = [
@@ -68,7 +68,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     frame.render_widget(table, inner);
 }
 
-fn net_event_row(event: &Event) -> Row<'static> {
+fn net_event_row(event: &Event, app: &App) -> Row<'static> {
     let ts = event
         .timestamp
         .with_timezone(&Local)
@@ -100,11 +100,11 @@ fn net_event_row(event: &Event) -> Row<'static> {
         let bytes = theme::format_bytes(bytes_sent + bytes_recv);
 
         Row::new(vec![
-            Cell::from(ts).style(theme::dim()),
-            Cell::from(host).style(Style::default().fg(Color::White)),
-            Cell::from(remote_port.to_string()).style(theme::dim()),
-            Cell::from(cat_label).style(cat_style),
-            Cell::from(bytes).style(theme::dim()),
+            Cell::from(ts).style(app.style(theme::dim())),
+            Cell::from(host).style(app.style(Style::default().fg(Color::White))),
+            Cell::from(remote_port.to_string()).style(app.style(theme::dim())),
+            Cell::from(cat_label).style(app.style(cat_style)),
+            Cell::from(bytes).style(app.style(theme::dim())),
         ])
     } else {
         Row::new(vec![Cell::from("")])

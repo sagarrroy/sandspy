@@ -262,7 +262,13 @@ async fn handle_watch(command: String, global: GlobalOptions) -> Result<()> {
     // Branch: TUI dashboard vs plain live stream
     let live_stats = if global.dashboard {
         // Dashboard mode: rx moves into the TUI runner
-        let stats = ui::run_dashboard(rx, agent_label.clone(), agent_pid_hint).await?;
+        let stats = ui::run_dashboard(
+            rx,
+            agent_label.clone(),
+            agent_pid_hint,
+            global.no_color || std::env::var("NO_COLOR").is_ok(),
+        )
+        .await?;
         // Abort all monitors since user quit
         process_handle.abort();
         filesystem_handle.abort();

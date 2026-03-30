@@ -27,7 +27,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     render_header(frame, rows[0], app);
     render_stats(frame, rows[1], app);
     render_feed(frame, rows[2], app);
-    render_shortcuts(frame, rows[3]);
+    render_shortcuts(frame, rows[3], app);
 }
 
 // ─── Header ─────────────────────────────────────────────────────────────────
@@ -35,15 +35,18 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
 fn render_header(frame: &mut Frame, area: Rect, app: &App) {
     let version = env!("CARGO_PKG_VERSION");
     let elapsed = app.elapsed_str();
-    let status = Span::styled("  ACTIVE", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD));
+    let status = Span::styled(
+        "  ACTIVE",
+        app.style(Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+    );
 
     let title_line = Line::from(vec![
         Span::styled(
             format!(" sandspy v{version} "),
-            Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+            app.style(Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
         ),
         Span::raw("─".repeat(area.width.saturating_sub(28) as usize)),
-        Span::styled(format!(" {elapsed}"), Style::default().fg(Color::DarkGray)),
+        Span::styled(format!(" {elapsed}"), app.style(Style::default().fg(Color::DarkGray))),
         status,
         Span::raw(" "),
     ]);
@@ -63,9 +66,9 @@ fn render_header(frame: &mut Frame, area: Rect, app: &App) {
 
     let text = vec![
         title_line,
-        Line::from(Span::styled(&agent_label, Style::default().fg(Color::White))),
-        Line::from(Span::styled(&risk_bar, theme::risk_gauge(risk))),
-        Line::from(Span::styled(&risk_label, theme::risk_label(risk))),
+        Line::from(Span::styled(&agent_label, app.style(Style::default().fg(Color::White)))),
+        Line::from(Span::styled(&risk_bar, app.style(theme::risk_gauge(risk)))),
+        Line::from(Span::styled(&risk_label, app.style(theme::risk_label(risk)))),
     ];
 
     let para = Paragraph::new(text);
@@ -89,25 +92,25 @@ fn render_stats(frame: &mut Frame, area: Rect, app: &App) {
     render_secret_stats(frame, cols[3], app);
 }
 
-fn stat_block(title: &str) -> Block<'_> {
+fn stat_block_for(app: &App, title: &'static str) -> Block<'static> {
     Block::default()
         .title(Span::styled(
             format!(" {title} "),
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+            app.style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
         ))
         .borders(Borders::ALL)
         .border_type(BorderType::Plain)
-        .border_style(theme::border())
+        .border_style(app.style(theme::border()))
 }
 
 fn render_files_stats(frame: &mut Frame, area: Rect, app: &App) {
     let s = &app.stats;
     let text = vec![
-        stat_line("read:   ", s.files_read, s.files_read > 0),
-        stat_line("written:", s.files_written, false),
-        stat_line("deleted:", s.files_deleted, s.files_deleted > 0),
+        stat_line(app, "read:   ", s.files_read, s.files_read > 0),
+        stat_line(app, "written:", s.files_written, false),
+        stat_line(app, "deleted:", s.files_deleted, s.files_deleted > 0),
     ];
-    let p = Paragraph::new(text).block(stat_block("FILES"));
+    let p = Paragraph::new(text).block(stat_block_for(app, "FILES"));
     frame.render_widget(p, area);
 }
 
@@ -122,63 +125,64 @@ fn render_network_stats(frame: &mut Frame, area: Rect, app: &App) {
 
     let text = vec![
         Line::from(vec![
-            Span::styled("  connect: ", theme::dim()),
-            Span::styled(s.net_connections.to_string(), Style::default().fg(Color::White)),
+            Span::styled("  connect: ", app.style(theme::dim())),
+            Span::styled(s.net_connections.to_string(), app.style(Style::default().fg(Color::White))),
         ]),
         Line::from(vec![
-            Span::styled("  data:    ", theme::dim()),
-            Span::styled(bytes_str, Style::default().fg(Color::White)),
+            Span::styled("  data:    ", app.style(theme::dim())),
+            Span::styled(bytes_str, app.style(Style::default().fg(Color::White))),
         ]),
         Line::from(vec![
-            Span::styled("  unknown: ", theme::dim()),
+            Span::styled("  unknown: ", app.style(theme::dim())),
             Span::styled(
                 unknown_str,
                 if s.net_unknown > 0 {
-                    theme::stat_danger()
+                    app.style(theme::stat_danger())
                 } else {
-                    theme::stat_normal()
+                    app.style(theme::stat_normal())
                 },
             ),
         ]),
     ];
-    let p = Paragraph::new(text).block(stat_block("NETWORK"));
+    let p = Paragraph::new(text).block(stat_block_for(app, "NETWORK"));
     frame.render_widget(p, area);
 }
 
 fn render_command_stats(frame: &mut Frame, area: Rect, app: &App) {
     let s = &app.stats;
     let text = vec![
-        stat_line("executed:", s.commands_total, false),
+        stat_line(app, "executed:", s.commands_total, false),
         stat_line(
+            app,
             "danger:  ",
             s.commands_dangerous,
             s.commands_dangerous > 0,
         ),
-        stat_line("failed:  ", s.commands_failed, s.commands_failed > 0),
+        stat_line(app, "failed:  ", s.commands_failed, s.commands_failed > 0),
     ];
-    let p = Paragraph::new(text).block(stat_block("COMMANDS"));
+    let p = Paragraph::new(text).block(stat_block_for(app, "COMMANDS"));
     frame.render_widget(p, area);
 }
 
 fn render_secret_stats(frame: &mut Frame, area: Rect, app: &App) {
     let s = &app.stats;
     let text = vec![
-        stat_line("accessed:", s.secrets_accessed, s.secrets_accessed > 0),
-        stat_line("leaked:  ", s.secrets_leaked, s.secrets_leaked > 0),
-        stat_line("residual:", s.residual_files, s.residual_files > 0),
+        stat_line(app, "accessed:", s.secrets_accessed, s.secrets_accessed > 0),
+        stat_line(app, "leaked:  ", s.secrets_leaked, s.secrets_leaked > 0),
+        stat_line(app, "residual:", s.residual_files, s.residual_files > 0),
     ];
-    let p = Paragraph::new(text).block(stat_block("SECRETS"));
+    let p = Paragraph::new(text).block(stat_block_for(app, "SECRETS"));
     frame.render_widget(p, area);
 }
 
-fn stat_line(label: &str, value: usize, warn: bool) -> Line<'_> {
+fn stat_line(app: &App, label: &'static str, value: usize, warn: bool) -> Line<'static> {
     let val_style = if warn {
-        theme::stat_danger()
+        app.style(theme::stat_danger())
     } else {
-        theme::stat_normal()
+        app.style(theme::stat_normal())
     };
     Line::from(vec![
-        Span::styled(format!("  {label} "), theme::dim()),
+        Span::styled(format!("  {label} "), app.style(theme::dim())),
         Span::styled(value.to_string(), val_style),
     ])
 }
@@ -189,11 +193,11 @@ fn render_feed(frame: &mut Frame, area: Rect, app: &App) {
     let block = Block::default()
         .title(Span::styled(
             " LIVE FEED ",
-            Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+            app.style(Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
         ))
         .borders(Borders::ALL)
         .border_type(BorderType::Plain)
-        .border_style(theme::border());
+        .border_style(app.style(theme::border()));
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -205,7 +209,7 @@ fn render_feed(frame: &mut Frame, area: Rect, app: &App) {
         .rev()
         .take(max_lines)
         .rev()
-        .map(|e| ListItem::new(format_event_line(e)))
+        .map(|e| ListItem::new(format_event_line(e, app.no_color)))
         .collect();
 
     let list = List::new(items);
@@ -214,24 +218,24 @@ fn render_feed(frame: &mut Frame, area: Rect, app: &App) {
 
 // ─── Shortcut bar ───────────────────────────────────────────────────────────
 
-fn render_shortcuts(frame: &mut Frame, area: Rect) {
+fn render_shortcuts(frame: &mut Frame, area: Rect, app: &App) {
     let line = Line::from(vec![
-        Span::styled(" [f]", Style::default().fg(Color::Cyan)),
-        Span::styled("files ", theme::dim()),
-        Span::styled("[n]", Style::default().fg(Color::Cyan)),
-        Span::styled("net ", theme::dim()),
-        Span::styled("[d]", Style::default().fg(Color::Cyan)),
-        Span::styled("diffs ", theme::dim()),
-        Span::styled("[s]", Style::default().fg(Color::Cyan)),
-        Span::styled("summary ", theme::dim()),
-        Span::styled("[a]", Style::default().fg(Color::Cyan)),
-        Span::styled("alerts ", theme::dim()),
-        Span::styled("[tab]", Style::default().fg(Color::Cyan)),
-        Span::styled("switch ", theme::dim()),
-        Span::styled("[j/k]", Style::default().fg(Color::Cyan)),
-        Span::styled("scroll ", theme::dim()),
-        Span::styled("[q]", Style::default().fg(Color::Red)),
-        Span::styled("quit ", theme::dim()),
+        Span::styled(" [f]", app.style(Style::default().fg(Color::Cyan))),
+        Span::styled("files ", app.style(theme::dim())),
+        Span::styled("[n]", app.style(Style::default().fg(Color::Cyan))),
+        Span::styled("net ", app.style(theme::dim())),
+        Span::styled("[d]", app.style(Style::default().fg(Color::Cyan))),
+        Span::styled("diffs ", app.style(theme::dim())),
+        Span::styled("[s]", app.style(Style::default().fg(Color::Cyan))),
+        Span::styled("summary ", app.style(theme::dim())),
+        Span::styled("[a]", app.style(Style::default().fg(Color::Cyan))),
+        Span::styled("alerts ", app.style(theme::dim())),
+        Span::styled("[tab]", app.style(Style::default().fg(Color::Cyan))),
+        Span::styled("switch ", app.style(theme::dim())),
+        Span::styled("[j/k]", app.style(Style::default().fg(Color::Cyan))),
+        Span::styled("scroll ", app.style(theme::dim())),
+        Span::styled("[q]", app.style(Style::default().fg(Color::Red))),
+        Span::styled("quit ", app.style(theme::dim())),
     ]);
     let p = Paragraph::new(line);
     frame.render_widget(p, area);
@@ -239,7 +243,26 @@ fn render_shortcuts(frame: &mut Frame, area: Rect) {
 
 // ─── Shared event formatter (used by feed and other panels) ─────────────────
 
-pub fn format_event_line(event: &Event) -> Line<'static> {
+pub fn format_event_line(event: &Event, no_color: bool) -> Line<'static> {
+    if no_color {
+        let plain = match &event.kind {
+            EventKind::FileRead { path, .. } => format!("FILE READ {}", path.display()),
+            EventKind::FileWrite { path, .. } => format!("FILE WRITE {}", path.display()),
+            EventKind::FileDelete { path } => format!("FILE DELETE {}", path.display()),
+            EventKind::NetworkConnection { remote_addr, remote_port, .. } => {
+                format!("NET {}:{}", remote_addr, remote_port)
+            }
+            EventKind::ShellCommand { command, .. } => format!("CMD {}", command),
+            EventKind::SecretAccess { name, .. } => format!("SECRET {}", name),
+            EventKind::EnvVarRead { name, .. } => format!("ENV {}", name),
+            EventKind::ClipboardRead { .. } => "CLIPBOARD read".to_string(),
+            EventKind::Alert { message, .. } => format!("ALERT {}", message),
+            EventKind::ProcessSpawn { name, pid, .. } => format!("PROC {} ({})", name, pid),
+            _ => String::new(),
+        };
+        return Line::from(Span::raw(plain));
+    }
+
     let ts = event.timestamp.with_timezone(&Local).format("%H:%M:%S").to_string();
     let ts_span = Span::styled(ts, theme::dim());
 

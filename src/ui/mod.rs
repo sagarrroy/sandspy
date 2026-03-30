@@ -36,10 +36,11 @@ use tokio::sync::mpsc;
 /// Returns a SessionStats snapshot so main.rs can print the post-session summary.
 pub async fn run_dashboard(
     mut rx: mpsc::Receiver<Event>,
-    agent_label: String,
-    agent_pid: Option<u32>,
+    _agent_label: String,
+    _agent_pid: Option<u32>,
+    no_color: bool,
 ) -> Result<SessionStats> {
-    let app = Arc::new(Mutex::new(App::new(None)));
+    let app = Arc::new(Mutex::new(App::new(None, no_color)));
     let app_writer = app.clone();
 
     // Spawn background task: receives monitor events → updates App state

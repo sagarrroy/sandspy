@@ -26,13 +26,13 @@ fn render_file_list(frame: &mut Frame, area: Rect, app: &App) {
     let block = Block::default()
         .title(Span::styled(
             " FILES ",
-            Style::default()
+            app.style(Style::default()
                 .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
+                .add_modifier(Modifier::BOLD)),
         ))
         .borders(Borders::ALL)
         .border_type(BorderType::Plain)
-        .border_style(theme::border());
+        .border_style(app.style(theme::border()));
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -53,7 +53,7 @@ fn render_file_list(frame: &mut Frame, area: Rect, app: &App) {
                     .unwrap_or_else(|| path.display().to_string());
                 ListItem::new(Line::from(Span::styled(
                     format!("  {name}"),
-                    Style::default().fg(Color::White),
+                    app.style(Style::default().fg(Color::White)),
                 )))
             } else {
                 ListItem::new(Line::from(""))
@@ -64,7 +64,7 @@ fn render_file_list(frame: &mut Frame, area: Rect, app: &App) {
     if items.is_empty() {
         let msg = Paragraph::new(Line::from(Span::styled(
             "  no writes yet",
-            theme::dim(),
+            app.style(theme::dim()),
         )));
         frame.render_widget(msg, inner);
     } else {
@@ -77,13 +77,13 @@ fn render_diff_content(frame: &mut Frame, area: Rect, app: &App) {
     let block = Block::default()
         .title(Span::styled(
             " DIFF ",
-            Style::default()
+            app.style(Style::default()
                 .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
+                .add_modifier(Modifier::BOLD)),
         ))
         .borders(Borders::ALL)
         .border_type(BorderType::Plain)
-        .border_style(theme::border());
+        .border_style(app.style(theme::border()));
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -97,7 +97,7 @@ fn render_diff_content(frame: &mut Frame, area: Rect, app: &App) {
         None => {
             let msg = Paragraph::new(Line::from(Span::styled(
                 "  no diffs captured yet",
-                theme::dim(),
+                app.style(theme::dim()),
             )));
             frame.render_widget(msg, inner);
         }
@@ -108,17 +108,17 @@ fn render_diff_content(frame: &mut Frame, area: Rect, app: &App) {
                 let lines = vec![
                     Line::from(Span::styled(
                         format!("  {}", path.display()),
-                        Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+                        app.style(Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
                     )),
                     Line::from(""),
                     Line::from(Span::styled(
                         format!("  changes: {summary}"),
-                        Style::default().fg(Color::Cyan),
+                        app.style(Style::default().fg(Color::Cyan)),
                     )),
                     Line::from(""),
                     Line::from(Span::styled(
                         "  (full diff available after session via sandspy report)",
-                        theme::dim(),
+                        app.style(theme::dim()),
                     )),
                 ];
                 let para = Paragraph::new(lines).wrap(Wrap { trim: false });

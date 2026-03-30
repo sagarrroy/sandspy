@@ -7,6 +7,7 @@
 
 use crate::events::{AgentInfo, Event, EventKind, NetCategory, RiskLevel};
 use chrono::{DateTime, Utc};
+use ratatui::style::Style;
 use std::collections::VecDeque;
 
 // Maximum events kept in the ring buffer (memory safety)
@@ -157,10 +158,13 @@ pub struct App {
 
     /// Whether the TUI should shut down on the next tick.
     pub should_quit: bool,
+
+    /// Disable all color styling in TUI rendering.
+    pub no_color: bool,
 }
 
 impl App {
-    pub fn new(agent: Option<AgentInfo>) -> Self {
+    pub fn new(agent: Option<AgentInfo>, no_color: bool) -> Self {
         Self {
             agent,
             session_start: Utc::now(),
@@ -171,6 +175,15 @@ impl App {
             active_tab: Tab::Dashboard,
             scroll_offset: 0,
             should_quit: false,
+            no_color,
+        }
+    }
+
+    pub fn style(&self, style: Style) -> Style {
+        if self.no_color {
+            Style::default()
+        } else {
+            style
         }
     }
 
