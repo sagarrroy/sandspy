@@ -1,17 +1,24 @@
 // sandspy::analysis::risk — Risk scoring engine
-// TODO: Sprint 1
 
 use crate::events::{Event, EventKind, NetCategory, RiskLevel};
+use std::path::Path;
 
 const NORMALIZATION_BASELINE: u32 = 200;
+const UNKNOWN_DATA_ALERT_THRESHOLD_BYTES: u64 = 10 * 1024;
 
 pub struct RiskScorer {
     total_points: u32,
+    unknown_data_sent: u64,
+    unknown_data_alerted: bool,
 }
 
 impl RiskScorer {
     pub fn new() -> Self {
-        Self { total_points: 0 }
+        Self {
+            total_points: 0,
+            unknown_data_sent: 0,
+            unknown_data_alerted: false,
+        }
     }
 
     /// Process an event and return the updated risk score (0-100).
@@ -35,6 +42,69 @@ impl RiskScorer {
             61..=80 => RiskLevel::High,
             _ => RiskLevel::Critical,
         }
+    }
+
+    pub fn process_with_alerts(&mut self, event: &Event) -> (u32, Vec<Event>) {
+        let score = self.process(event);
+        let mut alerts = Vec::new();
+
+        match &event.kind {
+            EventKind::NetworkConnection {
+                remote_addr,
+                remote_port,
+                category,
+                bytes_sent,
+                ..
+            } => {
+                if *category == NetCategory::Unknown {
+                    alerts.push(Event::new(EventKind::Alert {
+                        message: format!(
+                            "unknown network connection detected: {}:{}",
+                            remote_addr, remote_port
+                        ),
+                        severity: RiskLevel::High,
+                    }));
+
+                    self.unknown_data_sent = self.unknown_data_sent.saturating_add(*bytes_sent);
+                    if !self.unknown_data_alerted
+                        && self.unknown_data_sent >= UNKNOWN_DATA_ALERT_THRESHOLD_BYTES
+                    {
+                        self.unknown_data_alerted = true;
+                        alerts.push(Event::new(EventKind::Alert {
+                            message: format!(
+                                "unknown network data threshold exceeded: {} bytes",
+                                self.unknown_data_sent
+                            ),
+                            severity: RiskLevel::Critical,
+                        }));
+                    }
+                }
+            }
+            EventKind::ShellCommand { command, risk, .. } => {
+                if *risk == RiskLevel::Critical {
+                    alerts.push(Event::new(EventKind::Alert {
+                        message: format!("critical shell command executed: {command}"),
+                        severity: RiskLevel::Critical,
+                    }));
+                }
+            }
+            EventKind::FileRead {
+                path,
+                sensitive,
+                ..
+            } => {
+                if *sensitive && is_ssh_or_pem(path) {
+                    alerts.push(Event::new(EventKind::Alert {
+                        message: format!("sensitive key file read: {}", path.display()),
+                        severity: RiskLevel::Critical,
+                    }));
+                }
+            }
+            EventKind::Alert { .. } => {}
+            _ => {}
+        }
+
+        (score, alerts)
     }
 
     fn points_for(kind: &EventKind) -> u32 {
@@ -62,4 +132,9 @@ impl RiskScorer {
             EventKind::CommandComplete { .. } => 0,
         }
     }
+}
+
+fn is_ssh_or_pem(path: &Path) -> bool {
+    let normalized = path.to_string_lossy().replace('\\', "/").to_ascii_lowercase();
+    normalized.contains("/.ssh/") || normalized.ends_with(".pem")
 }
