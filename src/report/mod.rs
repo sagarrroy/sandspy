@@ -9,6 +9,8 @@ use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 
+pub mod html;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionMetadata {
 	pub agent_name: String,
@@ -123,7 +125,7 @@ fn resolve_session_dir(session_id: &str) -> Result<PathBuf> {
 		.with_context(|| format!("session not found: {session_id}"))
 }
 
-fn extract_findings(events: &[Event]) -> Vec<Finding> {
+pub fn extract_findings(events: &[Event]) -> Vec<Finding> {
 	let mut findings = Vec::new();
 
 	for event in events {

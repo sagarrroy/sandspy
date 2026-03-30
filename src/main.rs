@@ -57,8 +57,8 @@ struct Cli {
 enum Commands {
     /// Launch a command and monitor it
     Watch {
-        /// Command to launch and monitor
-        command: String,
+        /// Command to launch and monitor. If absent, Sandspy auto-detects running agents.
+        command: Option<String>,
     },
     /// Attach to a running process
     Attach {
@@ -131,6 +131,7 @@ enum Verbosity {
 enum ReportFormat {
     Markdown,
     Json,
+    Html,
 }
 
 #[derive(Debug, Clone)]
@@ -201,10 +202,24 @@ async fn handle_command(command: Commands, global: GlobalOptions) -> Result<()> 
     }
 }
 
-async fn handle_watch(command: String, global: GlobalOptions) -> Result<()> {
+async fn handle_watch(command: Option<String>, global: GlobalOptions) -> Result<()> {
+    let watch_command = match command.clone() {
+        Some(cmd) => cmd,
+        None => {
+            // Auto detect
+            let agents = monitor::process::scan_for_agents();
+            if agents.is_empty() {
+                anyhow::bail!("No running AI agents detected. Please specify an agent name (e.g. `sandspy watch Code`)");
+            }
+            let agent = &agents[0];
+            println!("\x1b[32m[!] Detected {} running on PID {}. Attaching...\x1b[0m", agent.name, agent.pid);
+            agent.name.clone()
+        }
+    };
+
     let session_start = SystemTime::now();
     let loaded_profiles = analysis::profiler::load_profiles()?;
-    let command_token = command.split_whitespace().next();
+    let command_token = watch_command.split_whitespace().next();
     let matched_profile = analysis::profiler::match_profile(
         &loaded_profiles,
         global.profile.as_deref(),
@@ -212,7 +227,7 @@ async fn handle_watch(command: String, global: GlobalOptions) -> Result<()> {
     );
 
     tracing::info!(
-        command = %command,
+        command = %watch_command,
         profile = ?matched_profile.map(|profile| profile.id.clone()),
         dashboard = global.dashboard,
         verbosity = ?global.verbosity,
@@ -224,7 +239,6 @@ async fn handle_watch(command: String, global: GlobalOptions) -> Result<()> {
     let (tx, mut rx) = events::create_event_bus();
     let pids = monitor::process::create_pid_set();
     let process_state = Arc::new(RwLock::new(WatchProcessState::default()));
-    let watch_command = command.clone();
     let tx_for_process = tx.clone();
     let tx_for_filesystem = tx.clone();
     let tx_for_network = tx.clone();
@@ -237,25 +251,51 @@ async fn handle_watch(command: String, global: GlobalOptions) -> Result<()> {
     let pids_for_command = pids.clone();
     let pids_for_environment = pids.clone();
 
+    let watch_command_clone = watch_command.clone();
     let process_handle = tokio::spawn(async move {
-        // Find ALL processes with this name and seed the PID set immediately.
-        // This ensures network/env/command monitors are non-empty from tick 0.
-        let command_name = watch_command.split_whitespace().next().unwrap_or(&watch_command);
-        let all_pids = monitor::process::find_all_pids_by_name(command_name);
+        let command_name = watch_command_clone.split_whitespace().next().unwrap_or(&watch_command_clone);
+        let is_spawn = monitor::process::find_all_pids_by_name(command_name).is_empty();
 
-        if !all_pids.is_empty() {
-            monitor::process::seed_pid_set(&pids_for_process, &all_pids).await;
-            tracing::info!(
-                pids = ?all_pids,
-                name = command_name,
-                "attaching to existing process(es)"
-            );
-            // Monitor the tree from the lowest (root) PID; the rest are already seeded
-            monitor::process::attach_and_monitor(all_pids[0], tx_for_process, pids_for_process).await
-        } else {
-            tracing::info!(command = %watch_command, "spawning and monitoring");
-            monitor::process::spawn_and_monitor(&watch_command, tx_for_process, pids_for_process).await
+        if is_spawn {
+            tracing::info!(command = %watch_command_clone, "spawning and monitoring");
+            let _ = monitor::process::spawn_and_monitor(&watch_command_clone, tx_for_process.clone(), pids_for_process.clone()).await;
         }
+
+        // Self-Healing Loop
+        loop {
+            let all_pids = monitor::process::find_all_pids_by_name(command_name);
+
+            if !all_pids.is_empty() {
+                monitor::process::seed_pid_set(&pids_for_process, &all_pids).await;
+                tracing::info!(
+                    pids = ?all_pids,
+                    name = command_name,
+                    "attaching to existing process(es)"
+                );
+
+                let event = crate::events::Event::new(crate::events::EventKind::Alert {
+                    message: format!("Agent {} attached (PID {})", command_name, all_pids[0]),
+                    severity: crate::events::RiskLevel::Low,
+                });
+                let _ = tx_for_process.send(event).await;
+
+                // Monitor the tree. This blocks until the root PID dies.
+                let _ = monitor::process::attach_and_monitor(all_pids[0], tx_for_process.clone(), pids_for_process.clone()).await;
+
+                tracing::info!("Agent {} exited. Waiting for respawn...", command_name);
+                
+                let event = crate::events::Event::new(crate::events::EventKind::Alert {
+                    message: format!("Agent {} exited. Waiting for respawn...", command_name),
+                    severity: crate::events::RiskLevel::Medium,
+                });
+                let _ = tx_for_process.send(event).await;
+            }
+
+            tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+        }
+
+        #[allow(unreachable_code)]
+        Ok::<(), anyhow::Error>(())
     });
     let filesystem_handle = tokio::spawn(async move {
         monitor::filesystem::run(tx_for_filesystem, pids_for_filesystem).await
@@ -272,7 +312,7 @@ async fn handle_watch(command: String, global: GlobalOptions) -> Result<()> {
     let clipboard_handle = tokio::spawn(async move { monitor::clipboard::run(tx_for_clipboard).await });
 
     // Agent label for the header
-    let agent_label = command.clone();
+    let agent_label = watch_command.clone();
     let verbosity_level: u8 = match global.verbosity {
         Verbosity::Low => 0,
         Verbosity::Medium => 1,
@@ -337,7 +377,7 @@ async fn handle_watch(command: String, global: GlobalOptions) -> Result<()> {
         .max(0) as u64;
     let agent_pid = agent_pid_hint;
     let metadata = history::SessionMetadata {
-        agent_name: command.clone(),
+        agent_name: watch_command.clone(),
         pid: agent_pid,
         duration: duration_secs,
         risk_score: live_stats.risk_score,
@@ -348,7 +388,7 @@ async fn handle_watch(command: String, global: GlobalOptions) -> Result<()> {
 
     // Print post-session summary
     let summary_data = ui::summary::SessionData {
-        agent_name: command.clone(),
+        agent_name: watch_command.clone(),
         agent_pid,
         start: session_start_utc,
         end: chrono::Utc::now(),
@@ -445,6 +485,12 @@ async fn handle_report(
         }
         ReportFormat::Markdown => {
             report::print_markdown_summary(metadata, events);
+        }
+        ReportFormat::Html => {
+            let output = report::html::build_html_report(&metadata, &events);
+            let path = format!("sandspy_report_{}_{}.html", metadata.agent_name, metadata.timestamp.format("%Y%m%d_%H%M%S"));
+            std::fs::write(&path, output)?;
+            println!("HTML Report saved to: {}", path);
         }
     }
 
