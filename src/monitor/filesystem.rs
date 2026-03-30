@@ -150,8 +150,11 @@ async fn handle_notify_event(
                     return Ok(());
                 }
 
-                // Scan content for secrets
-                emit_secret_access_events_with_source(path, tx, SecretSource::File).await?;
+                // Only scan content for secrets on sensitive file types
+                // (avoids false positives from docs/code containing example keys)
+                if sensitive {
+                    emit_secret_access_events_with_source(path, tx, SecretSource::File).await?;
+                }
             }
             NotifyEventKind::Modify(_) => {
                 let diff_summary = build_write_summary(path, snapshots, false);
@@ -234,6 +237,11 @@ async fn emit_secret_access_events_with_source(
             continue;
         }
 
+        // Skip values that look like placeholders/examples
+        if secrets::is_placeholder_value(&finding.matched_value) {
+            continue;
+        }
+
         let risk = secrets::secret_risk_score(&finding.pattern_name);
         let event = Event::with_risk(
             EventKind::SecretAccess {
@@ -292,6 +300,7 @@ fn read_text_file_if_small(path: &Path) -> Option<String> {
     }
     fs::read_to_string(path).ok()
 }
+
 
 async fn resolve_watch_dir(pids: &PidSet) -> PathBuf {
     let pid_snapshot = {

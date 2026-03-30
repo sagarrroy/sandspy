@@ -29,7 +29,12 @@ pub async fn run(tx: mpsc::Sender<Event>) -> Result<()> {
             Ok(text) => {
                 let changed = last_text.as_ref().map(|prev| prev != &text).unwrap_or(true);
                 if changed {
-                    let findings = secrets::scan_text(&text);
+                    let raw_findings = secrets::scan_text(&text);
+                    // Filter out placeholder/example values (e.g. from docs or this conversation)
+                    let findings: Vec<_> = raw_findings
+                        .into_iter()
+                        .filter(|f| !secrets::is_placeholder_value(&f.matched_value))
+                        .collect();
                     let contains_secret = !findings.is_empty();
                     last_text = Some(text);
 

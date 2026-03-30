@@ -91,6 +91,44 @@ pub fn secret_risk_score(pattern_name: &str) -> u32 {
     }
 }
 
+/// Returns true if the matched string looks like a placeholder, example, or documentation key.
+/// These show up in READMEs, handoff docs, and test code but are not real credentials.
+pub fn is_placeholder_value(value: &str) -> bool {
+    let lower = value.to_ascii_lowercase();
+
+    // AWS documentation example key
+    if lower.contains("example") || lower.contains("your_key") || lower.contains("your-key") {
+        return true;
+    }
+
+    // Common placeholder words
+    let placeholders = [
+        "placeholder", "changeme", "replace_me", "insert_here",
+        "xxxxxxxx", "aaaaaaaa", "12345678", "abcdefgh",
+        "testtest", "dummy", "fake", "sample", "demo",
+    ];
+    if placeholders.iter().any(|p| lower.contains(p)) {
+        return true;
+    }
+
+    // Detect low-entropy values: if more than 60% of chars are from the same 4-char set,
+    // it's probably a repeating fake sequence like "aaabbbcccdddeee"
+    let alnum: Vec<char> = value.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
+    if alnum.len() >= 16 {
+        let mut freq = [0u32; 128];
+        for &c in &alnum {
+            freq[c as usize] += 1;
+        }
+        let max_freq = freq.iter().max().copied().unwrap_or(0);
+        // If any single character makes up >35% of the value, it's low entropy
+        if max_freq as f64 / alnum.len() as f64 > 0.35 {
+            return true;
+        }
+    }
+
+    false
+}
+
 // ─── Pattern definitions (embedded — no file dependency) ─────────────────────
 
 fn build_patterns() -> Vec<CompiledPattern> {
