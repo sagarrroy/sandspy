@@ -304,6 +304,25 @@ impl App {
 
         // Add findings for high-severity raw events
         match &event.kind {
+            EventKind::SecretAccess { name, source } => {
+                let src = match source {
+                    crate::events::SecretSource::File => "file",
+                    crate::events::SecretSource::EnvVar => "env",
+                    crate::events::SecretSource::Clipboard => "clipboard",
+                };
+                self.add_finding(Finding {
+                    severity: RiskLevel::High,
+                    message: format!("secret detected [{src}]: {name}"),
+                    timestamp: event.timestamp,
+                });
+            }
+            EventKind::EnvVarRead { name, sensitive: true } => {
+                self.add_finding(Finding {
+                    severity: RiskLevel::Medium,
+                    message: format!("sensitive env var accessed: {name}"),
+                    timestamp: event.timestamp,
+                });
+            }
             EventKind::FileRead {
                 path,
                 sensitive: true,
@@ -327,7 +346,7 @@ impl App {
                     .map(|d| format!("{d}:{remote_port}"))
                     .unwrap_or_else(|| format!("{remote_addr}:{remote_port}"));
                 self.add_finding(Finding {
-                    severity: RiskLevel::High,
+                    severity: RiskLevel::Medium,
                     message: format!("unknown destination: {host}"),
                     timestamp: event.timestamp,
                 });

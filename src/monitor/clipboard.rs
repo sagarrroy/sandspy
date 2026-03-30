@@ -33,20 +33,23 @@ pub async fn run(tx: mpsc::Sender<Event>) -> Result<()> {
                     let contains_secret = !findings.is_empty();
                     last_text = Some(text);
 
-                    let event = Event::new(EventKind::ClipboardRead {
+                    // Clipboard read with a secret = higher risk
+                    let clip_risk = if contains_secret { 15 } else { 0 };
+                    let event = Event::with_risk(EventKind::ClipboardRead {
                         content_type: "text".to_string(),
                         contains_secret,
-                    });
+                    }, clip_risk);
 
                     if tx.send(event).await.is_err() {
                         return Ok(());
                     }
 
                     for finding in findings.into_iter().take(5) {
-                        let secret_event = Event::new(EventKind::SecretAccess {
+                        let risk = secrets::secret_risk_score(&finding.pattern_name);
+                        let secret_event = Event::with_risk(EventKind::SecretAccess {
                             name: finding.pattern_name,
                             source: SecretSource::Clipboard,
-                        });
+                        }, risk);
 
                         if tx.send(secret_event).await.is_err() {
                             return Ok(());

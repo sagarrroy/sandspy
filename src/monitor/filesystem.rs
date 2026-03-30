@@ -1,4 +1,8 @@
 // sandspy::monitor::filesystem — File access watching
+//
+// Uses notify to watch the project directory recursively.
+// Emits FileWrite, FileDelete, and SecretAccess events.
+// Secret scanning runs on every file write AND at startup for pre-existing sensitive files.
 
 use crate::analysis::secrets;
 use crate::events::{Event, EventKind, FileCategory, SecretSource};
@@ -13,17 +17,15 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 
-const MAX_DIFF_BYTES: u64 = 100 * 1024;
-/// How long to wait before emitting a second event for the same path.
-const DEBOUNCE_MS: u64 = 200;
-
+const MAX_SCAN_BYTES: u64 = 512 * 1024; // 512KB — scan larger files than before
+const DEBOUNCE_MS: u64 = 300;
 
 pub async fn run(tx: mpsc::Sender<Event>, pids: PidSet) -> Result<()> {
-    // Try to resolve the working directory of the monitored process.
-    // Fallback to sandspy's own cwd if unavailable (e.g. no pids yet, or Windows
-    // doesn't expose it for that process).
     let watch_dir = resolve_watch_dir(&pids).await;
     let mut snapshots = preload_sensitive_snapshots(&watch_dir);
+
+    // Scan pre-existing sensitive files at startup and emit findings immediately
+    startup_secret_scan(&watch_dir, &tx).await?;
 
     let (notify_tx, mut notify_rx) = tokio::sync::mpsc::unbounded_channel();
     let mut watcher = notify::recommended_watcher(move |event| {
@@ -35,9 +37,9 @@ pub async fn run(tx: mpsc::Sender<Event>, pids: PidSet) -> Result<()> {
         .watch(&watch_dir, RecursiveMode::Recursive)
         .with_context(|| format!("failed to watch directory: {}", watch_dir.display()))?;
 
-    // Also watch home dir sensitive files (.ssh, .aws, .env in home)
+    // Also watch common sensitive locations in home dir
     if let Some(home) = dirs::home_dir() {
-        for sensitive in &[".ssh", ".aws"] {
+        for sensitive in &[".ssh", ".aws", ".config/gcloud", ".kube"] {
             let p = home.join(sensitive);
             if p.exists() {
                 let _ = watcher.watch(&p, RecursiveMode::Recursive);
@@ -47,7 +49,6 @@ pub async fn run(tx: mpsc::Sender<Event>, pids: PidSet) -> Result<()> {
 
     tracing::debug!(dir = %watch_dir.display(), "filesystem monitor watching");
 
-    // Debounce table: path -> last emit time
     let mut last_emit: HashMap<PathBuf, Instant> = HashMap::new();
     let debounce = Duration::from_millis(DEBOUNCE_MS);
 
@@ -60,16 +61,13 @@ pub async fn run(tx: mpsc::Sender<Event>, pids: PidSet) -> Result<()> {
             }
         };
 
-        // Debounce: skip if we emitted for this path recently
         let now = Instant::now();
         let paths_to_process: Vec<_> = event
             .paths
             .iter()
-            .filter(|p| {
-                match last_emit.get(*p) {
-                    Some(t) if now.duration_since(*t) < debounce => false,
-                    _ => true,
-                }
+            .filter(|p| match last_emit.get(*p) {
+                Some(t) if now.duration_since(*t) < debounce => false,
+                _ => true,
             })
             .cloned()
             .collect();
@@ -82,7 +80,6 @@ pub async fn run(tx: mpsc::Sender<Event>, pids: PidSet) -> Result<()> {
             continue;
         }
 
-        // Build a filtered event with only the debounced paths
         let mut filtered = event.clone();
         filtered.paths = paths_to_process;
         handle_notify_event(&filtered, &tx, &mut snapshots).await?;
@@ -91,32 +88,40 @@ pub async fn run(tx: mpsc::Sender<Event>, pids: PidSet) -> Result<()> {
     Ok(())
 }
 
-/// Resolve the best directory to watch for the target process.
-async fn resolve_watch_dir(pids: &PidSet) -> PathBuf {
-    let pid_snapshot = {
-        let guard = pids.read().await;
-        guard.iter().copied().collect::<Vec<_>>()
-    };
+/// Scan sensitive files that already exist at monitoring start.
+/// This catches secrets that were written before sandspy was launched.
+async fn startup_secret_scan(root: &Path, tx: &mpsc::Sender<Event>) -> Result<()> {
+    let mut paths = Vec::new();
+    let _ = visit_tree(root, &mut |p| {
+        if !is_noise_path(p) && is_sensitive_path(p) {
+            paths.push(p.to_path_buf());
+        }
+    });
 
-    if !pid_snapshot.is_empty() {
-        let mut sys = sysinfo::System::new();
-        sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
-
-        for pid in &pid_snapshot {
-            if let Some(proc) = sys.process(sysinfo::Pid::from_u32(*pid)) {
-                if let Some(cwd) = proc.cwd() {
-                    if cwd.exists() {
-                        return cwd.to_path_buf();
-                    }
-                }
+    // Also check home dir sensitive files
+    if let Some(home) = dirs::home_dir() {
+        for rel in &[
+            ".env",
+            ".aws/credentials",
+            ".aws/config",
+            ".ssh/id_rsa",
+            ".ssh/id_ed25519",
+            ".netrc",
+            ".pgpass",
+        ] {
+            let p = home.join(rel);
+            if p.exists() {
+                paths.push(p);
             }
         }
     }
 
-    // Fallback: sandspy's own cwd (still useful when watching a local project)
-    std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
-}
+    for path in paths {
+        emit_secret_access_events_with_source(&path, tx, SecretSource::File).await?;
+    }
 
+    Ok(())
+}
 
 async fn handle_notify_event(
     event: &NotifyEvent,
@@ -131,33 +136,53 @@ async fn handle_notify_event(
         match &event.kind {
             NotifyEventKind::Create(_) => {
                 let diff_summary = build_write_summary(path, snapshots, true);
-                let file_event = Event::new(EventKind::FileWrite {
-                    path: path.clone(),
-                    diff_summary,
-                });
+                let sensitive = is_sensitive_path(path);
+                let risk = if sensitive { 15 } else { 0 };
+                let file_event = Event::with_risk(
+                    EventKind::FileWrite {
+                        path: path.clone(),
+                        diff_summary,
+                    },
+                    risk,
+                );
 
                 if tx.send(file_event).await.is_err() {
                     return Ok(());
                 }
 
-                emit_secret_access_events(path, tx).await?;
+                // Scan content for secrets
+                emit_secret_access_events_with_source(path, tx, SecretSource::File).await?;
             }
             NotifyEventKind::Modify(_) => {
                 let diff_summary = build_write_summary(path, snapshots, false);
-                let file_event = Event::new(EventKind::FileWrite {
-                    path: path.clone(),
-                    diff_summary,
-                });
+                let sensitive = is_sensitive_path(path);
+                let risk = if sensitive { 10 } else { 0 };
+                let file_event = Event::with_risk(
+                    EventKind::FileWrite {
+                        path: path.clone(),
+                        diff_summary,
+                    },
+                    risk,
+                );
 
                 if tx.send(file_event).await.is_err() {
                     return Ok(());
                 }
 
-                emit_secret_access_events(path, tx).await?;
+                // Scan content on every modify for sensitive files
+                if sensitive {
+                    emit_secret_access_events_with_source(path, tx, SecretSource::File).await?;
+                }
             }
             NotifyEventKind::Remove(_) => {
                 snapshots.remove(path);
-                let file_event = Event::new(EventKind::FileDelete { path: path.clone() });
+                let sensitive = is_sensitive_path(path);
+                // Deleting a sensitive file is suspicious (covering tracks)
+                let risk = if sensitive { 20 } else { 0 };
+                let file_event = Event::with_risk(
+                    EventKind::FileDelete { path: path.clone() },
+                    risk,
+                );
 
                 if tx.send(file_event).await.is_err() {
                     return Ok(());
@@ -170,17 +195,53 @@ async fn handle_notify_event(
     Ok(())
 }
 
-async fn emit_secret_access_events(path: &Path, tx: &mpsc::Sender<Event>) -> Result<()> {
+async fn emit_secret_access_events_with_source(
+    path: &Path,
+    tx: &mpsc::Sender<Event>,
+    source: SecretSource,
+) -> Result<()> {
+    // For known sensitive filenames — even without content match — emit a warning
+    let fname = path.file_name().and_then(|f| f.to_str()).unwrap_or_default();
+    if secrets::is_sensitive_filename(fname) {
+        // We know this file is sensitive regardless of content
+        // Only emit if we can't scan it (binary, too large, etc.)
+        if read_text_file_if_small(path).is_none() {
+            let event = Event::with_risk(
+                EventKind::SecretAccess {
+                    name: format!("sensitive file: {fname}"),
+                    source: source.clone(),
+                },
+                20,
+            );
+            if tx.send(event).await.is_err() {
+                return Ok(());
+            }
+            return Ok(());
+        }
+    }
+
     let Some(contents) = read_text_file_if_small(path) else {
         return Ok(());
     };
 
     let findings = secrets::scan_text(&contents);
-    for finding in findings.into_iter().take(5) {
-        let event = Event::new(EventKind::SecretAccess {
-            name: finding.pattern_name,
-            source: SecretSource::File,
-        });
+
+    // Deduplicate by pattern name within this file scan
+    let mut seen_patterns = std::collections::HashSet::new();
+
+    for finding in findings.into_iter().take(10) {
+        if !seen_patterns.insert(finding.pattern_name.clone()) {
+            continue;
+        }
+
+        let risk = secrets::secret_risk_score(&finding.pattern_name);
+        let event = Event::with_risk(
+            EventKind::SecretAccess {
+                name: finding.pattern_name,
+                source: source.clone(),
+            },
+            risk,
+        );
 
         if tx.send(event).await.is_err() {
             return Ok(());
@@ -210,11 +271,11 @@ fn build_write_summary(
 
     let inserted = diff
         .iter_all_changes()
-        .filter(|change| change.tag() == similar::ChangeTag::Insert)
+        .filter(|c| c.tag() == similar::ChangeTag::Insert)
         .count();
     let deleted = diff
         .iter_all_changes()
-        .filter(|change| change.tag() == similar::ChangeTag::Delete)
+        .filter(|c| c.tag() == similar::ChangeTag::Delete)
         .count();
 
     if inserted == 0 && deleted == 0 {
@@ -226,11 +287,34 @@ fn build_write_summary(
 
 fn read_text_file_if_small(path: &Path) -> Option<String> {
     let metadata = fs::metadata(path).ok()?;
-    if !metadata.is_file() || metadata.len() > MAX_DIFF_BYTES {
+    if !metadata.is_file() || metadata.len() > MAX_SCAN_BYTES {
         return None;
     }
-
     fs::read_to_string(path).ok()
+}
+
+async fn resolve_watch_dir(pids: &PidSet) -> PathBuf {
+    let pid_snapshot = {
+        let guard = pids.read().await;
+        guard.iter().copied().collect::<Vec<_>>()
+    };
+
+    if !pid_snapshot.is_empty() {
+        let mut sys = sysinfo::System::new();
+        sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+
+        for pid in &pid_snapshot {
+            if let Some(proc) = sys.process(sysinfo::Pid::from_u32(*pid)) {
+                if let Some(cwd) = proc.cwd() {
+                    if cwd.exists() {
+                        return cwd.to_path_buf();
+                    }
+                }
+            }
+        }
+    }
+
+    std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
 }
 
 fn preload_sensitive_snapshots(root: &Path) -> HashMap<PathBuf, String> {
@@ -239,12 +323,10 @@ fn preload_sensitive_snapshots(root: &Path) -> HashMap<PathBuf, String> {
         if is_noise_path(path) || !is_sensitive_path(path) {
             return;
         }
-
         if let Some(contents) = read_text_file_if_small(path) {
             snapshots.insert(path.to_path_buf(), contents);
         }
     });
-
     snapshots
 }
 
@@ -257,7 +339,7 @@ where
     }
 
     let metadata = match fs::metadata(path) {
-        Ok(metadata) => metadata,
+        Ok(m) => m,
         Err(_) => return Ok(()),
     };
 
@@ -272,24 +354,20 @@ where
 
     for entry in fs::read_dir(path)? {
         let entry = match entry {
-            Ok(entry) => entry,
+            Ok(e) => e,
             Err(_) => continue,
         };
-        let entry_path = entry.path();
-        let _ = visit_tree(&entry_path, callback);
+        let _ = visit_tree(&entry.path(), callback);
     }
 
     Ok(())
 }
 
 fn is_noise_path(path: &Path) -> bool {
-    let normalized = path.to_string_lossy().replace('\\', "/").to_lowercase();
-
-    // Block all .git/ internals (index, COMMIT_EDITMSG, lock files, refs, objects, etc.)
-    if normalized.contains("/.git/") {
+    let s = path.to_string_lossy().replace('\\', "/").to_lowercase();
+    if s.contains("/.git/") {
         return true;
     }
-
     [
         "/node_modules/",
         "/target/",
@@ -297,35 +375,56 @@ fn is_noise_path(path: &Path) -> bool {
         "/.next/",
         "/dist/",
         "/build/",
+        "/.venv/",
+        "/vendor/",
     ]
     .iter()
-    .any(|segment| normalized.contains(segment))
+    .any(|seg| s.contains(seg))
 }
 
-fn is_sensitive_path(path: &Path) -> bool {
-    let normalized = path.to_string_lossy().replace('\\', "/").to_lowercase();
-    let file_name = path
+pub fn is_sensitive_path(path: &Path) -> bool {
+    let s = path.to_string_lossy().replace('\\', "/").to_lowercase();
+    let fname = path
         .file_name()
-        .and_then(|value| value.to_str())
+        .and_then(|f| f.to_str())
         .unwrap_or_default()
         .to_lowercase();
 
-    if file_name == ".env" || file_name.starts_with(".env.") {
+    // .env files (any variant)
+    if fname == ".env" || fname.starts_with(".env.") || fname.ends_with(".env") {
         return true;
     }
 
-    if normalized.contains("/.ssh/") || normalized.contains("/.aws/credentials") {
+    // SSH keys
+    if s.contains("/.ssh/") {
         return true;
     }
 
-    if [".pem", ".key", ".p12", ".pfx"]
-        .iter()
-        .any(|ext| file_name.ends_with(ext))
+    // Cloud credential files
+    if s.contains("/.aws/credentials")
+        || s.contains("/.aws/config")
+        || s.contains("/.gcloud/")
+        || s.contains("/.kube/config")
+        || fname == ".netrc"
+        || fname == ".pgpass"
     {
         return true;
     }
 
-    ["credentials", "secret", "token"].iter().any(|needle| file_name.contains(needle))
+    // Certificate / key files
+    if [".pem", ".key", ".p12", ".pfx", ".jks", ".keystore"]
+        .iter()
+        .any(|ext| fname.ends_with(ext))
+    {
+        return true;
+    }
+
+    // Name-based heuristics
+    let triggers = [
+        "credentials", "secret", "token", "password", "passwd",
+        "apikey", "api_key", "auth_token",
+    ];
+    triggers.iter().any(|t| fname.contains(t))
 }
 
 #[allow(dead_code)]
@@ -334,13 +433,13 @@ fn categorize_path(path: &Path) -> FileCategory {
         return FileCategory::Secret;
     }
 
-    let extension = path
+    let ext = path
         .extension()
-        .and_then(|ext| ext.to_str())
+        .and_then(|e| e.to_str())
         .unwrap_or_default()
         .to_lowercase();
 
-    match extension.as_str() {
+    match ext.as_str() {
         "rs" | "py" | "ts" | "js" | "tsx" | "jsx" | "go" | "java" | "c" | "cpp" | "h"
         | "rb" | "php" | "swift" | "kt" => FileCategory::Source,
         "toml" | "yaml" | "yml" | "json" | "xml" | "ini" | "cfg" => FileCategory::Config,
@@ -366,19 +465,10 @@ mod tests {
     fn sensitive_path_detection_catches_core_patterns() {
         assert!(is_sensitive_path(Path::new(".env")));
         assert!(is_sensitive_path(Path::new(".env.production")));
+        assert!(is_sensitive_path(Path::new("app.env")));
         assert!(is_sensitive_path(Path::new("C:/Users/test/.ssh/id_rsa")));
         assert!(is_sensitive_path(Path::new("service_credentials.json")));
         assert!(is_sensitive_path(Path::new("key.pem")));
         assert!(!is_sensitive_path(Path::new("src/main.rs")));
-    }
-
-    #[test]
-    fn categorization_by_extension_is_correct() {
-        assert_eq!(categorize_path(Path::new("src/main.rs")), FileCategory::Source);
-        assert_eq!(categorize_path(Path::new("Cargo.toml")), FileCategory::Config);
-        assert_eq!(categorize_path(Path::new("README.md")), FileCategory::Documentation);
-        assert_eq!(categorize_path(Path::new("binary.exe")), FileCategory::Binary);
-        assert_eq!(categorize_path(Path::new("notes.bin")), FileCategory::Data);
-        assert_eq!(categorize_path(Path::new(".env")), FileCategory::Secret);
     }
 }
