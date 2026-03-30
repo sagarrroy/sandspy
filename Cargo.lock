@@ -2841,6 +2841,7 @@ dependencies = [
  "dirs",
  "dns-lookup",
  "glob",
+ "libc",
  "netstat2",
  "notify",
  "notify-rust",
