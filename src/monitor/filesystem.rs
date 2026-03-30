@@ -1,6 +1,7 @@
 // sandspy::monitor::filesystem — File access watching
 
-use crate::events::{Event, EventKind, FileCategory};
+use crate::analysis::secrets;
+use crate::events::{Event, EventKind, FileCategory, SecretSource};
 use crate::monitor::process::PidSet;
 use anyhow::{Context, Result};
 use notify::{Event as NotifyEvent, EventKind as NotifyEventKind, RecursiveMode, Watcher};
@@ -63,6 +64,8 @@ async fn handle_notify_event(
                 if tx.send(file_event).await.is_err() {
                     return Ok(());
                 }
+
+                emit_secret_access_events(path, tx).await?;
             }
             NotifyEventKind::Modify(_) => {
                 let diff_summary = build_write_summary(path, snapshots, false);
@@ -74,6 +77,8 @@ async fn handle_notify_event(
                 if tx.send(file_event).await.is_err() {
                     return Ok(());
                 }
+
+                emit_secret_access_events(path, tx).await?;
             }
             NotifyEventKind::Remove(_) => {
                 snapshots.remove(path);
@@ -84,6 +89,26 @@ async fn handle_notify_event(
                 }
             }
             _ => {}
+        }
+    }
+
+    Ok(())
+}
+
+async fn emit_secret_access_events(path: &Path, tx: &mpsc::Sender<Event>) -> Result<()> {
+    let Some(contents) = read_text_file_if_small(path) else {
+        return Ok(());
+    };
+
+    let findings = secrets::scan_text(&contents);
+    for finding in findings.into_iter().take(5) {
+        let event = Event::new(EventKind::SecretAccess {
+            name: finding.pattern_name,
+            source: SecretSource::File,
+        });
+
+        if tx.send(event).await.is_err() {
+            return Ok(());
         }
     }
 

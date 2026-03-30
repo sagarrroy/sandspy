@@ -1,6 +1,8 @@
 // sandspy::monitor::clipboard — Clipboard access monitoring
 
+use crate::analysis::secrets;
 use crate::events::{Event, EventKind};
+use crate::events::SecretSource;
 use anyhow::Result;
 use arboard::Clipboard;
 use std::time::Duration;
@@ -27,7 +29,8 @@ pub async fn run(tx: mpsc::Sender<Event>) -> Result<()> {
             Ok(text) => {
                 let changed = last_text.as_ref().map(|prev| prev != &text).unwrap_or(true);
                 if changed {
-                    let contains_secret = contains_secret_like(&text);
+                    let findings = secrets::scan_text(&text);
+                    let contains_secret = !findings.is_empty();
                     last_text = Some(text);
 
                     let event = Event::new(EventKind::ClipboardRead {
@@ -38,6 +41,17 @@ pub async fn run(tx: mpsc::Sender<Event>) -> Result<()> {
                     if tx.send(event).await.is_err() {
                         return Ok(());
                     }
+
+                    for finding in findings.into_iter().take(5) {
+                        let secret_event = Event::new(EventKind::SecretAccess {
+                            name: finding.pattern_name,
+                            source: SecretSource::Clipboard,
+                        });
+
+                        if tx.send(secret_event).await.is_err() {
+                            return Ok(());
+                        }
+                    }
                 }
             }
             Err(error) => {
@@ -47,16 +61,4 @@ pub async fn run(tx: mpsc::Sender<Event>) -> Result<()> {
 
         time::sleep(Duration::from_secs(1)).await;
     }
-}
-
-fn contains_secret_like(text: &str) -> bool {
-    let lower = text.to_ascii_lowercase();
-
-    lower.contains("api_key")
-        || lower.contains("token")
-        || lower.contains("secret")
-        || lower.contains("password")
-        || lower.contains("aws_")
-        || lower.contains("github_")
-        || lower.contains("database_url")
 }
