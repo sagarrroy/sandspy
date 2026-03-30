@@ -80,7 +80,7 @@ pub fn build_html_report(metadata: &SessionMetadata, events: &[Event]) -> String
             "<div class='flex items-center gap-4 py-2 border-b border-[#222] font-mono text-[11px] hover:bg-[#111] px-4'>
                 <div class='text-[#666] w-16 shrink-0'>{}</div>
                 <div class='w-24 shrink-0 font-bold {}'>{}</div>
-                <div class='text-[#ccc] truncate flex-1'>{}</div>
+                <div class='text-[#ccc] overflow-x-auto whitespace-nowrap flex-1 row-scrollbar mr-2 pb-0.5'>{}</div>
                 {}
             </div>",
             time_str, color, label, escape_html(&details), risk_badge
@@ -125,6 +125,20 @@ pub fn build_html_report(metadata: &SessionMetadata, events: &[Event]) -> String
             border-radius: 4px;
         }}
         ::-webkit-scrollbar-thumb:hover {{
+            background: #555;
+        }}
+        /* Hidden but accessible row scrollbars */
+        .row-scrollbar::-webkit-scrollbar {{
+            height: 2px;
+        }}
+        .row-scrollbar::-webkit-scrollbar-track {{
+            background: transparent;
+        }}
+        .row-scrollbar::-webkit-scrollbar-thumb {{
+            background: #333;
+            border-radius: 2px;
+        }}
+        .row-scrollbar:hover::-webkit-scrollbar-thumb {{
             background: #555;
         }}
     </style>
@@ -195,7 +209,7 @@ pub fn build_html_report(metadata: &SessionMetadata, events: &[Event]) -> String
         </div>
         
         <footer class="text-center pt-10 pb-4 text-[10px] text-[#555] font-mono tracking-widest uppercase">
-            SANDSPY security telemetry engine
+            SANDSPY
         </footer>
     </div>
 </body>
