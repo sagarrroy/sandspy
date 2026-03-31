@@ -164,6 +164,13 @@ fn is_sensitive_env_name(name: &str) -> bool {
     }
 
     // Broad keyword-based matching
-    let keywords = ["TOKEN", "SECRET", "PASSWORD", "PASSWD", "PRIVATE", "CREDENTIAL"];
+    let keywords = [
+        "TOKEN",
+        "SECRET",
+        "PASSWORD",
+        "PASSWD",
+        "PRIVATE",
+        "CREDENTIAL",
+    ];
     keywords.iter().any(|k| u.contains(k))
 }

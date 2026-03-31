@@ -1,12 +1,10 @@
 // sandspy::monitor::network — Network connection tracking
 
-use crate::events::{Event, EventKind, NetCategory};
 use crate::analysis::resolver;
+use crate::events::{Event, EventKind, NetCategory};
 use crate::monitor::process::PidSet;
 use anyhow::{Context, Result};
-use netstat2::{
-    get_sockets_info, AddressFamilyFlags, ProtocolFlags, ProtocolSocketInfo,
-};
+use netstat2::{get_sockets_info, AddressFamilyFlags, ProtocolFlags, ProtocolSocketInfo};
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -45,7 +43,6 @@ pub async fn run(tx: mpsc::Sender<Event>, pids: PidSet) -> Result<()> {
             time::sleep(Duration::from_millis(50)).await;
             continue;
         }
-
 
         let sockets = match get_sockets_info(
             AddressFamilyFlags::IPV4 | AddressFamilyFlags::IPV6,
@@ -95,21 +92,25 @@ pub async fn run(tx: mpsc::Sender<Event>, pids: PidSet) -> Result<()> {
             }
 
             let (domain, ip_category) = resolver::resolve(&remote_addr);
-            let category = categorize_target(&remote_addr, domain.as_deref(), ip_category, &signatures);
+            let category =
+                categorize_target(&remote_addr, domain.as_deref(), ip_category, &signatures);
             let risk_score = match category {
                 NetCategory::Unknown => 8,
                 NetCategory::Tracking => 5,
                 NetCategory::Telemetry => 2,
                 NetCategory::ExpectedApi => 0,
             };
-            let event = Event::with_risk(EventKind::NetworkConnection {
-                remote_addr,
-                remote_port,
-                domain,
-                category,
-                bytes_sent: 0,
-                bytes_recv: 0,
-            }, risk_score);
+            let event = Event::with_risk(
+                EventKind::NetworkConnection {
+                    remote_addr,
+                    remote_port,
+                    domain,
+                    category,
+                    bytes_sent: 0,
+                    bytes_recv: 0,
+                },
+                risk_score,
+            );
 
             if tx.send(event).await.is_err() {
                 return Ok(());
@@ -118,7 +119,6 @@ pub async fn run(tx: mpsc::Sender<Event>, pids: PidSet) -> Result<()> {
 
         // 50ms poll — fast enough to catch short-lived HTTPS connections
         time::sleep(Duration::from_millis(50)).await;
-
     }
 }
 
@@ -128,10 +128,16 @@ fn load_signatures() -> Result<SignatureDb> {
     let trackers_path = root.join("signatures").join("trackers.toml");
 
     let expected_entries = load_signature_map(&expected_path).with_context(|| {
-        format!("failed to load expected api signatures: {}", expected_path.display())
+        format!(
+            "failed to load expected api signatures: {}",
+            expected_path.display()
+        )
     })?;
     let tracker_entries = load_signature_map(&trackers_path).with_context(|| {
-        format!("failed to load tracker signatures: {}", trackers_path.display())
+        format!(
+            "failed to load tracker signatures: {}",
+            trackers_path.display()
+        )
     })?;
 
     let expected_domains = expected_entries

@@ -136,10 +136,18 @@ fn classify_command_risk(command: &str) -> RiskLevel {
     }
 
     let high_patterns = [
-        "chmod", "chown", "netcat", "nc ", "ncat",
-        "reg add", "reg delete",
-        "schtasks", "sc create", "sc start",
-        "certutil -decode", "certutil -urlcache",
+        "chmod",
+        "chown",
+        "netcat",
+        "nc ",
+        "ncat",
+        "reg add",
+        "reg delete",
+        "schtasks",
+        "sc create",
+        "sc start",
+        "certutil -decode",
+        "certutil -urlcache",
         "bitsadmin",
     ];
     if high_patterns
@@ -150,10 +158,8 @@ fn classify_command_risk(command: &str) -> RiskLevel {
     }
 
     let medium_patterns = [
-        "env", "printenv", "set ",
-        "curl ", "wget ",
-        "ssh ", "scp ", "rsync ",
-        "docker ", "kubectl ",
+        "env", "printenv", "set ", "curl ", "wget ", "ssh ", "scp ", "rsync ", "docker ",
+        "kubectl ",
     ];
     if medium_patterns
         .iter()

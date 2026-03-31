@@ -212,7 +212,10 @@ async fn handle_watch(command: Option<String>, global: GlobalOptions) -> Result<
                 anyhow::bail!("No running AI agents detected. Please specify an agent name (e.g. `sandspy watch Code`)");
             }
             let agent = &agents[0];
-            println!("\x1b[32m[!] Detected {} running on PID {}. Attaching...\x1b[0m", agent.name, agent.pid);
+            println!(
+                "\x1b[32m[!] Detected {} running on PID {}. Attaching...\x1b[0m",
+                agent.name, agent.pid
+            );
             agent.name.clone()
         }
     };
@@ -253,12 +256,20 @@ async fn handle_watch(command: Option<String>, global: GlobalOptions) -> Result<
 
     let watch_command_clone = watch_command.clone();
     let process_handle = tokio::spawn(async move {
-        let command_name = watch_command_clone.split_whitespace().next().unwrap_or(&watch_command_clone);
+        let command_name = watch_command_clone
+            .split_whitespace()
+            .next()
+            .unwrap_or(&watch_command_clone);
         let is_spawn = monitor::process::find_all_pids_by_name(command_name).is_empty();
 
         if is_spawn {
             tracing::info!(command = %watch_command_clone, "spawning and monitoring");
-            let _ = monitor::process::spawn_and_monitor(&watch_command_clone, tx_for_process.clone(), pids_for_process.clone()).await;
+            let _ = monitor::process::spawn_and_monitor(
+                &watch_command_clone,
+                tx_for_process.clone(),
+                pids_for_process.clone(),
+            )
+            .await;
         }
 
         // Self-Healing Loop
@@ -280,10 +291,15 @@ async fn handle_watch(command: Option<String>, global: GlobalOptions) -> Result<
                 let _ = tx_for_process.send(event).await;
 
                 // Monitor the tree. This blocks until the root PID dies.
-                let _ = monitor::process::attach_and_monitor(all_pids[0], tx_for_process.clone(), pids_for_process.clone()).await;
+                let _ = monitor::process::attach_and_monitor(
+                    all_pids[0],
+                    tx_for_process.clone(),
+                    pids_for_process.clone(),
+                )
+                .await;
 
                 tracing::info!("Agent {} exited. Waiting for respawn...", command_name);
-                
+
                 let event = crate::events::Event::new(crate::events::EventKind::Alert {
                     message: format!("Agent {} exited. Waiting for respawn...", command_name),
                     severity: crate::events::RiskLevel::Medium,
@@ -300,16 +316,15 @@ async fn handle_watch(command: Option<String>, global: GlobalOptions) -> Result<
     let filesystem_handle = tokio::spawn(async move {
         monitor::filesystem::run(tx_for_filesystem, pids_for_filesystem).await
     });
-    let network_handle = tokio::spawn(async move {
-        monitor::network::run(tx_for_network, pids_for_network).await
-    });
-    let command_handle = tokio::spawn(async move {
-        monitor::command::run(tx_for_command, pids_for_command).await
-    });
+    let network_handle =
+        tokio::spawn(async move { monitor::network::run(tx_for_network, pids_for_network).await });
+    let command_handle =
+        tokio::spawn(async move { monitor::command::run(tx_for_command, pids_for_command).await });
     let environment_handle = tokio::spawn(async move {
         monitor::environment::run(tx_for_environment, pids_for_environment).await
     });
-    let clipboard_handle = tokio::spawn(async move { monitor::clipboard::run(tx_for_clipboard).await });
+    let clipboard_handle =
+        tokio::spawn(async move { monitor::clipboard::run(tx_for_clipboard).await });
 
     // Agent label for the header
     let agent_label = watch_command.clone();
@@ -346,9 +361,10 @@ async fn handle_watch(command: Option<String>, global: GlobalOptions) -> Result<
         stats
     } else {
         // Live stream mode: spawn printer, wait for process to finish naturally
-        let printer_handle = tokio::spawn(async move {
-            ui::live::run(&mut rx, &agent_label, verbosity_level).await
-        });
+        let printer_handle =
+            tokio::spawn(
+                async move { ui::live::run(&mut rx, &agent_label, verbosity_level).await },
+            );
 
         process_handle.await??;
         filesystem_handle.abort();
@@ -405,8 +421,11 @@ async fn handle_watch(command: Option<String>, global: GlobalOptions) -> Result<
     Ok(())
 }
 
-
-async fn handle_attach(pid: Option<u32>, name: Option<String>, global: GlobalOptions) -> Result<()> {
+async fn handle_attach(
+    pid: Option<u32>,
+    name: Option<String>,
+    global: GlobalOptions,
+) -> Result<()> {
     tracing::info!(
         pid = ?pid,
         name = ?name,
@@ -437,7 +456,11 @@ async fn handle_attach(pid: Option<u32>, name: Option<String>, global: GlobalOpt
 
     let (tx, mut rx) = events::create_event_bus();
     let pids = monitor::process::create_pid_set();
-    let monitor_handle = tokio::spawn(monitor::process::attach_and_monitor(target_pid, tx.clone(), pids));
+    let monitor_handle = tokio::spawn(monitor::process::attach_and_monitor(
+        target_pid,
+        tx.clone(),
+        pids,
+    ));
     let process_state = Arc::new(RwLock::new(WatchProcessState::default()));
     drop(tx);
 
@@ -488,7 +511,11 @@ async fn handle_report(
         }
         ReportFormat::Html => {
             let output = report::html::build_html_report(&metadata, &events);
-            let path = std::env::current_dir()?.join(format!("sandspy_report_{}_{}.html", metadata.agent_name, metadata.timestamp.format("%Y%m%d_%H%M%S")));
+            let path = std::env::current_dir()?.join(format!(
+                "sandspy_report_{}_{}.html",
+                metadata.agent_name,
+                metadata.timestamp.format("%Y%m%d_%H%M%S")
+            ));
             std::fs::write(&path, output)?;
             println!("HTML Report saved to: {}", path.display());
         }
@@ -655,10 +682,7 @@ async fn print_watch_events(
             events::EventKind::EnvVarRead { name, sensitive } => {
                 println!(
                     "{:?} EnvVarRead name={} sensitive={} score={}",
-                    event.timestamp,
-                    name,
-                    sensitive,
-                    score
+                    event.timestamp, name, sensitive, score
                 );
             }
             events::EventKind::ClipboardRead {
@@ -667,19 +691,13 @@ async fn print_watch_events(
             } => {
                 println!(
                     "{:?} ClipboardRead type={} contains_secret={} score={}",
-                    event.timestamp,
-                    content_type,
-                    contains_secret,
-                    score
+                    event.timestamp, content_type, contains_secret, score
                 );
             }
             events::EventKind::Alert { message, severity } => {
                 println!(
                     "{:?} ALERT severity={:?} message={} score={}",
-                    event.timestamp,
-                    severity,
-                    message,
-                    score
+                    event.timestamp, severity, message, score
                 );
             }
             _ => {}

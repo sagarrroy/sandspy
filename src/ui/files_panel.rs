@@ -15,9 +15,11 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let block = Block::default()
         .title(Span::styled(
             " FILES ",
-            app.style(Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD)),
+            app.style(
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
         ))
         .borders(Borders::ALL)
         .border_type(BorderType::Plain)
@@ -48,9 +50,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
 
     let total = file_events.len();
     let visible_height = inner.height.saturating_sub(2) as usize; // minus header + border
-    let offset = app
-        .scroll_offset
-        .min(total.saturating_sub(visible_height));
+    let offset = app.scroll_offset.min(total.saturating_sub(visible_height));
 
     let rows: Vec<Row> = file_events
         .iter()
@@ -66,9 +66,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         Constraint::Length(14),
     ];
 
-    let table = Table::new(rows, widths)
-        .header(header)
-        .column_spacing(1);
+    let table = Table::new(rows, widths).header(header).column_spacing(1);
 
     frame.render_widget(table, inner);
 }
@@ -81,7 +79,9 @@ fn file_event_row(event: &Event, app: &App) -> Row<'static> {
         .to_string();
 
     match &event.kind {
-        EventKind::FileRead { path, sensitive, .. } => {
+        EventKind::FileRead {
+            path, sensitive, ..
+        } => {
             let (label, label_style) = if *sensitive {
                 ("SENSITIVE", theme::label_sensitive())
             } else {
@@ -90,15 +90,18 @@ fn file_event_row(event: &Event, app: &App) -> Row<'static> {
             Row::new(vec![
                 Cell::from(ts).style(app.style(theme::dim())),
                 Cell::from("READ").style(app.style(theme::tag_read())),
-                Cell::from(path.display().to_string()).style(app.style(Style::default().fg(Color::White))),
+                Cell::from(path.display().to_string())
+                    .style(app.style(Style::default().fg(Color::White))),
                 Cell::from(label).style(app.style(label_style)),
             ])
         }
         EventKind::FileWrite { path, diff_summary } => Row::new(vec![
             Cell::from(ts).style(app.style(theme::dim())),
             Cell::from("WRITE").style(app.style(theme::tag_write())),
-            Cell::from(path.display().to_string()).style(app.style(Style::default().fg(Color::White))),
-            Cell::from(diff_summary.clone().unwrap_or_default()).style(app.style(theme::tag_write())),
+            Cell::from(path.display().to_string())
+                .style(app.style(Style::default().fg(Color::White))),
+            Cell::from(diff_summary.clone().unwrap_or_default())
+                .style(app.style(theme::tag_write())),
         ]),
         EventKind::FileDelete { path } => Row::new(vec![
             Cell::from(ts).style(app.style(theme::dim())),

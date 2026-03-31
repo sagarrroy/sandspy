@@ -182,10 +182,8 @@ async fn handle_notify_event(
                 let sensitive = is_sensitive_path(path);
                 // Deleting a sensitive file is suspicious (covering tracks)
                 let risk = if sensitive { 20 } else { 0 };
-                let file_event = Event::with_risk(
-                    EventKind::FileDelete { path: path.clone() },
-                    risk,
-                );
+                let file_event =
+                    Event::with_risk(EventKind::FileDelete { path: path.clone() }, risk);
 
                 if tx.send(file_event).await.is_err() {
                     return Ok(());
@@ -204,7 +202,10 @@ async fn emit_secret_access_events_with_source(
     source: SecretSource,
 ) -> Result<()> {
     // For known sensitive filenames — even without content match — emit a warning
-    let fname = path.file_name().and_then(|f| f.to_str()).unwrap_or_default();
+    let fname = path
+        .file_name()
+        .and_then(|f| f.to_str())
+        .unwrap_or_default();
     if secrets::is_sensitive_filename(fname) {
         // We know this file is sensitive regardless of content
         // Only emit if we can't scan it (binary, too large, etc.)
@@ -300,7 +301,6 @@ fn read_text_file_if_small(path: &Path) -> Option<String> {
     }
     fs::read_to_string(path).ok()
 }
-
 
 async fn resolve_watch_dir(pids: &PidSet) -> PathBuf {
     let pid_snapshot = {
@@ -430,8 +430,14 @@ pub fn is_sensitive_path(path: &Path) -> bool {
 
     // Name-based heuristics
     let triggers = [
-        "credentials", "secret", "token", "password", "passwd",
-        "apikey", "api_key", "auth_token",
+        "credentials",
+        "secret",
+        "token",
+        "password",
+        "passwd",
+        "apikey",
+        "api_key",
+        "auth_token",
     ];
     triggers.iter().any(|t| fname.contains(t))
 }
@@ -449,8 +455,8 @@ fn categorize_path(path: &Path) -> FileCategory {
         .to_lowercase();
 
     match ext.as_str() {
-        "rs" | "py" | "ts" | "js" | "tsx" | "jsx" | "go" | "java" | "c" | "cpp" | "h"
-        | "rb" | "php" | "swift" | "kt" => FileCategory::Source,
+        "rs" | "py" | "ts" | "js" | "tsx" | "jsx" | "go" | "java" | "c" | "cpp" | "h" | "rb"
+        | "php" | "swift" | "kt" => FileCategory::Source,
         "toml" | "yaml" | "yml" | "json" | "xml" | "ini" | "cfg" => FileCategory::Config,
         "md" | "txt" | "rst" | "adoc" => FileCategory::Documentation,
         "exe" | "dll" | "so" | "dylib" | "wasm" => FileCategory::Binary,
@@ -465,7 +471,9 @@ mod tests {
     #[test]
     fn noise_path_filter_matches_expected_dirs() {
         assert!(is_noise_path(Path::new("project/target/debug/app")));
-        assert!(is_noise_path(Path::new("project/node_modules/react/index.js")));
+        assert!(is_noise_path(Path::new(
+            "project/node_modules/react/index.js"
+        )));
         assert!(is_noise_path(Path::new("project/.git/objects/ab/cd")));
         assert!(!is_noise_path(Path::new("project/src/main.rs")));
     }

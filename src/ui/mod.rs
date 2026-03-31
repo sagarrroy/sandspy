@@ -173,10 +173,14 @@ fn handle_key(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
         KeyCode::Char('g') => app.scroll_offset = 999_999,
         // PageUp/PageDown jump 10 at a time
         KeyCode::PageUp => {
-            for _ in 0..10 { app.scroll_down(); }
+            for _ in 0..10 {
+                app.scroll_down();
+            }
         }
         KeyCode::PageDown => {
-            for _ in 0..10 { app.scroll_up(); }
+            for _ in 0..10 {
+                app.scroll_up();
+            }
         }
 
         _ => {}

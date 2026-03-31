@@ -77,20 +77,13 @@ pub fn print_header(agent_label: &str) {
     println!("  {}", format!("watching {agent_label}").dimmed());
     println!("  {}", "press ctrl+c to stop and view summary".dimmed());
     println!();
-    println!(
-        "  {}",
-        "─".repeat(65).dimmed()
-    );
+    println!("  {}", "─".repeat(65).dimmed());
     println!();
 }
 
 /// Main live-stream loop. Renders each event as a pretty line.
 /// Also rewrites the status bar every 2 seconds.
-pub async fn run(
-    rx: &mut mpsc::Receiver<Event>,
-    agent_label: &str,
-    verbosity: u8,
-) -> SessionStats {
+pub async fn run(rx: &mut mpsc::Receiver<Event>, agent_label: &str, verbosity: u8) -> SessionStats {
     print_header(agent_label);
 
     let mut stats = SessionStats::new();
@@ -137,9 +130,10 @@ fn accumulate(stats: &mut SessionStats, event: &Event) {
             }
         }
         EventKind::ShellCommand { .. } => stats.commands += 1,
-        EventKind::SecretAccess { .. } | EventKind::EnvVarRead { sensitive: true, .. } => {
-            stats.secrets += 1
-        }
+        EventKind::SecretAccess { .. }
+        | EventKind::EnvVarRead {
+            sensitive: true, ..
+        } => stats.secrets += 1,
         EventKind::ClipboardRead { .. } => stats.clipboard_reads += 1,
         EventKind::Alert { .. } => stats.alerts += 1,
         _ => {}
@@ -152,18 +146,14 @@ fn should_print(event: &Event, verbosity: u8) -> bool {
         // Always show alerts and critical stuff
         EventKind::Alert { .. } => true,
         EventKind::SecretAccess { .. } => true,
-        EventKind::EnvVarRead { sensitive: true, .. } => true,
-        EventKind::FileRead { sensitive: true, .. } => true,
-        EventKind::NetworkConnection { category, .. }
-            if *category == NetCategory::Unknown =>
-        {
-            true
-        }
-        EventKind::ShellCommand { risk, .. }
-            if *risk >= RiskLevel::High =>
-        {
-            true
-        }
+        EventKind::EnvVarRead {
+            sensitive: true, ..
+        } => true,
+        EventKind::FileRead {
+            sensitive: true, ..
+        } => true,
+        EventKind::NetworkConnection { category, .. } if *category == NetCategory::Unknown => true,
+        EventKind::ShellCommand { risk, .. } if *risk >= RiskLevel::High => true,
 
         // medium and above
         EventKind::NetworkConnection { .. } if verbosity >= 1 => true,
@@ -186,7 +176,9 @@ fn print_event(event: &Event) {
     let ts = time.dimmed();
 
     match &event.kind {
-        EventKind::FileRead { path, sensitive, .. } => {
+        EventKind::FileRead {
+            path, sensitive, ..
+        } => {
             let tag = "READ ".white().dimmed();
             let target = path.display().to_string();
             let label = if *sensitive {
@@ -250,7 +242,11 @@ fn print_event(event: &Event) {
 
         EventKind::ProcessSpawn { name, pid, .. } => {
             let tag = "PROC ".white().dimmed();
-            println!("  {ts}  {tag}  {} {}", name.white(), format!("(pid {pid})").dimmed());
+            println!(
+                "  {ts}  {tag}  {} {}",
+                name.white(),
+                format!("(pid {pid})").dimmed()
+            );
         }
 
         EventKind::ProcessExit { pid, .. } => {
@@ -303,7 +299,9 @@ fn print_event(event: &Event) {
 fn print_status_bar(stats: &SessionStats) {
     let risk_colored = match stats.risk_score {
         0..=20 => format!("{}/100 LOW", stats.risk_score).green().to_string(),
-        21..=60 => format!("{}/100 MEDIUM", stats.risk_score).yellow().to_string(),
+        21..=60 => format!("{}/100 MEDIUM", stats.risk_score)
+            .yellow()
+            .to_string(),
         61..=80 => format!("{}/100 HIGH", stats.risk_score).red().to_string(),
         _ => format!("{}/100 CRITICAL", stats.risk_score)
             .red()

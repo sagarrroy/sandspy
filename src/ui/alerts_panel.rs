@@ -1,7 +1,10 @@
 // sandspy::ui::alerts_panel — Alerts tab (Tab::Alerts)
 
-use crate::ui::{app::{App, Finding}, theme};
 use crate::events::RiskLevel;
+use crate::ui::{
+    app::{App, Finding},
+    theme,
+};
 use chrono::Local;
 use ratatui::{
     layout::Rect,
@@ -15,9 +18,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let block = Block::default()
         .title(Span::styled(
             " ALERTS ",
-            app.style(Style::default()
-                .fg(Color::Red)
-                .add_modifier(Modifier::BOLD)),
+            app.style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
         ))
         .borders(Borders::ALL)
         .border_type(BorderType::Plain)
@@ -37,9 +38,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
 
     let total = app.findings.len();
     let visible_height = inner.height as usize;
-    let offset = app
-        .scroll_offset
-        .min(total.saturating_sub(visible_height));
+    let offset = app.scroll_offset.min(total.saturating_sub(visible_height));
 
     let items: Vec<ListItem> = app
         .findings
@@ -73,6 +72,9 @@ fn finding_item(f: &Finding, app: &App) -> ListItem<'static> {
         Span::raw("  "),
         Span::styled(sev_label, app.style(sev_style)),
         Span::raw("  "),
-        Span::styled(f.message.clone(), app.style(Style::default().fg(Color::White))),
+        Span::styled(
+            f.message.clone(),
+            app.style(Style::default().fg(Color::White)),
+        ),
     ]))
 }

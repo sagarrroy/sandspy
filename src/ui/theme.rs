@@ -12,7 +12,9 @@ pub fn border() -> Style {
 }
 
 pub fn title() -> Style {
-    Style::default().fg(Color::White).add_modifier(Modifier::BOLD)
+    Style::default()
+        .fg(Color::White)
+        .add_modifier(Modifier::BOLD)
 }
 
 pub fn dim() -> Style {
@@ -56,15 +58,11 @@ pub fn tag_cmd() -> Style {
 }
 
 pub fn tag_secret() -> Style {
-    Style::default()
-        .fg(Color::Red)
-        .add_modifier(Modifier::BOLD)
+    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
 }
 
 pub fn tag_alert() -> Style {
-    Style::default()
-        .fg(Color::Red)
-        .add_modifier(Modifier::BOLD)
+    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
 }
 
 pub fn tag_env() -> Style {
@@ -72,9 +70,7 @@ pub fn tag_env() -> Style {
 }
 
 pub fn tag_proc() -> Style {
-    Style::default()
-        .fg(Color::Gray)
-        .add_modifier(Modifier::DIM)
+    Style::default().fg(Color::Gray).add_modifier(Modifier::DIM)
 }
 
 pub fn tag_clip() -> Style {
@@ -90,9 +86,7 @@ pub fn label_sensitive() -> Style {
 }
 
 pub fn label_critical() -> Style {
-    Style::default()
-        .fg(Color::Red)
-        .add_modifier(Modifier::BOLD)
+    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
 }
 
 pub fn label_high() -> Style {
@@ -108,9 +102,7 @@ pub fn label_ok() -> Style {
 }
 
 pub fn label_unknown() -> Style {
-    Style::default()
-        .fg(Color::Red)
-        .add_modifier(Modifier::BOLD)
+    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
 }
 
 pub fn label_tracking() -> Style {
@@ -128,9 +120,7 @@ pub fn risk_gauge(score: u32) -> Style {
         0..=20 => Style::default().fg(Color::Green),
         21..=60 => Style::default().fg(Color::Yellow),
         61..=80 => Style::default().fg(Color::Red),
-        _ => Style::default()
-            .fg(Color::Red)
-            .add_modifier(Modifier::BOLD),
+        _ => Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
     }
 }
 
@@ -142,12 +132,8 @@ pub fn risk_label(score: u32) -> Style {
         21..=60 => Style::default()
             .fg(Color::Yellow)
             .add_modifier(Modifier::BOLD),
-        61..=80 => Style::default()
-            .fg(Color::Red)
-            .add_modifier(Modifier::BOLD),
-        _ => Style::default()
-            .fg(Color::Red)
-            .add_modifier(Modifier::BOLD),
+        61..=80 => Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+        _ => Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
     }
 }
 
@@ -173,9 +159,7 @@ pub fn stat_warning() -> Style {
 }
 
 pub fn stat_danger() -> Style {
-    Style::default()
-        .fg(Color::Red)
-        .add_modifier(Modifier::BOLD)
+    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
 }
 
 // ─── Utility ────────────────────────────────────────────────────────────────

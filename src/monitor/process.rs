@@ -72,7 +72,7 @@ pub fn find_all_pids_by_name(name: &str) -> Vec<u32> {
                 // This captures bundled helpers/language servers that live in subdirectories.
                 if let Some(parent) = exe.parent() {
                     let dir = parent.to_string_lossy().to_lowercase();
-                    
+
                     // Safety: Never use a global OS directory as an install root
                     let is_global = dir == "c:\\windows" 
                         || dir == "c:\\windows\\system32" 
@@ -114,7 +114,6 @@ pub fn find_all_pids_by_name(name: &str) -> Vec<u32> {
     result
 }
 
-
 /// Immediately seed the shared PID set with a list of known PIDs.
 /// Called before monitors start so they are non-empty from tick 0.
 pub async fn seed_pid_set(pids: &PidSet, initial: &[u32]) {
@@ -124,13 +123,8 @@ pub async fn seed_pid_set(pids: &PidSet, initial: &[u32]) {
     }
 }
 
-
 /// Spawn a command and monitor its process tree.
-pub async fn spawn_and_monitor(
-    command: &str,
-    tx: mpsc::Sender<Event>,
-    pids: PidSet,
-) -> Result<()> {
+pub async fn spawn_and_monitor(command: &str, tx: mpsc::Sender<Event>, pids: PidSet) -> Result<()> {
     let mut child = spawn_shell_command(command)
         .with_context(|| format!("failed to spawn watch command: {command}"))?;
     let root_pid = child.id();
@@ -143,13 +137,8 @@ pub async fn spawn_and_monitor(
     Ok(())
 }
 
-
 /// Attach to an existing PID and monitor its process tree.
-pub async fn attach_and_monitor(
-    pid: u32,
-    tx: mpsc::Sender<Event>,
-    pids: PidSet,
-) -> Result<()> {
+pub async fn attach_and_monitor(pid: u32, tx: mpsc::Sender<Event>, pids: PidSet) -> Result<()> {
     let initial: Vec<u32> = {
         let guard = pids.read().await;
         guard.iter().copied().collect()
@@ -277,7 +266,10 @@ fn snapshot_processes(processes: &HashMap<Pid, sysinfo::Process>) -> HashMap<u32
     table
 }
 
-fn collect_process_tree(root_pid: u32, process_table: &HashMap<u32, ProcessSnapshot>) -> HashSet<u32> {
+fn collect_process_tree(
+    root_pid: u32,
+    process_table: &HashMap<u32, ProcessSnapshot>,
+) -> HashSet<u32> {
     if !process_table.contains_key(&root_pid) {
         return HashSet::new();
     }

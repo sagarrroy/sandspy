@@ -74,8 +74,7 @@ pub async fn start() -> Result<()> {
 pub async fn stop() -> Result<()> {
     let pid_path = daemon_pid_path();
     let log_path = daemon_log_path();
-    let pid = read_pid_file(&pid_path)?
-        .context("daemon pid file not found or empty")?;
+    let pid = read_pid_file(&pid_path)?.context("daemon pid file not found or empty")?;
 
     terminate_pid(pid)?;
 
@@ -206,9 +205,7 @@ fn terminate_pid(pid: u32) -> Result<()> {
 #[cfg(target_os = "windows")]
 fn terminate_pid(pid: u32) -> Result<()> {
     use windows::Win32::Foundation::CloseHandle;
-    use windows::Win32::System::Threading::{
-        OpenProcess, TerminateProcess, PROCESS_TERMINATE,
-    };
+    use windows::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE};
 
     unsafe {
         let handle = OpenProcess(PROCESS_TERMINATE, false, pid)?;

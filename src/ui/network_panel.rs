@@ -15,9 +15,11 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let block = Block::default()
         .title(Span::styled(
             " NETWORK ",
-            app.style(Style::default()
-                .fg(Color::Blue)
-                .add_modifier(Modifier::BOLD)),
+            app.style(
+                Style::default()
+                    .fg(Color::Blue)
+                    .add_modifier(Modifier::BOLD),
+            ),
         ))
         .borders(Borders::ALL)
         .border_type(BorderType::Plain)
@@ -42,9 +44,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
 
     let total = net_events.len();
     let visible_height = inner.height.saturating_sub(2) as usize;
-    let offset = app
-        .scroll_offset
-        .min(total.saturating_sub(visible_height));
+    let offset = app.scroll_offset.min(total.saturating_sub(visible_height));
 
     let rows: Vec<Row> = net_events
         .iter()
@@ -61,9 +61,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         Constraint::Length(9),
     ];
 
-    let table = Table::new(rows, widths)
-        .header(header)
-        .column_spacing(1);
+    let table = Table::new(rows, widths).header(header).column_spacing(1);
 
     frame.render_widget(table, inner);
 }

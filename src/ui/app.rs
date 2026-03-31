@@ -236,9 +236,7 @@ impl App {
 
     /// Session elapsed seconds.
     pub fn elapsed_secs(&self) -> u64 {
-        (Utc::now() - self.session_start)
-            .num_seconds()
-            .max(0) as u64
+        (Utc::now() - self.session_start).num_seconds().max(0) as u64
     }
 
     pub fn elapsed_str(&self) -> String {
@@ -288,7 +286,9 @@ impl App {
                 }
             }
             EventKind::SecretAccess { .. } => self.stats.secrets_accessed += 1,
-            EventKind::EnvVarRead { sensitive: true, .. } => {
+            EventKind::EnvVarRead {
+                sensitive: true, ..
+            } => {
                 self.stats.secrets_accessed += 1;
             }
             EventKind::ClipboardRead { .. } => self.stats.clipboard_reads += 1,
@@ -316,7 +316,10 @@ impl App {
                     timestamp: event.timestamp,
                 });
             }
-            EventKind::EnvVarRead { name, sensitive: true } => {
+            EventKind::EnvVarRead {
+                name,
+                sensitive: true,
+            } => {
                 self.add_finding(Finding {
                     severity: RiskLevel::Medium,
                     message: format!("sensitive env var accessed: {name}"),

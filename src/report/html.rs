@@ -4,19 +4,21 @@ use chrono::Local;
 
 fn escape_html(s: &str) -> String {
     s.replace('&', "&amp;")
-     .replace('<', "&lt;")
-     .replace('>', "&gt;")
-     .replace('"', "&quot;")
-     .replace('\'', "&#39;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
 }
 
 pub fn build_html_report(metadata: &SessionMetadata, events: &[Event]) -> String {
     let findings = extract_findings(events);
-    
+
     // Build findings HTML
     let mut findings_html = String::new();
     if findings.is_empty() {
-        findings_html.push_str("<div class='p-4 text-gray-500 text-sm font-mono'>0 high-risk findings detected.</div>");
+        findings_html.push_str(
+            "<div class='p-4 text-gray-500 text-sm font-mono'>0 high-risk findings detected.</div>",
+        );
     } else {
         for finding in &findings {
             let color = match finding.severity {
@@ -31,7 +33,7 @@ pub fn build_html_report(metadata: &SessionMetadata, events: &[Event]) -> String
                 crate::events::RiskLevel::Medium => "MEDIUM",
                 crate::events::RiskLevel::Low => "LOW",
             };
-            
+
             findings_html.push_str(&format!(
                 "<div class='flex items-start gap-4 p-4 border-b border-[#222] transition-colors hover:bg-[#111]'>
                     <div class='mt-0.5 px-2 py-0.5 text-[10px] tracking-wider font-bold rounded border uppercase {}'>{}</div>
@@ -46,32 +48,66 @@ pub fn build_html_report(metadata: &SessionMetadata, events: &[Event]) -> String
     let mut feed_html = String::new();
     let mut count = 0;
     for event in events.iter().rev() {
-        if count >= 500 { break; }
-        
+        if count >= 500 {
+            break;
+        }
+
         // Convert Utc strictly to Local Timezone for display
         let local_time = event.timestamp.with_timezone(&Local);
         let time_str = format!("{}", local_time.format("%H:%M:%S"));
-        
+
         let (color, label, details) = match &event.kind {
-            crate::events::EventKind::FileRead { path, .. } => ("text-[#888]", "FILE_READ", path.display().to_string()),
-            crate::events::EventKind::FileWrite { path, .. } => ("text-[#eaeaea]", "FILE_WRITE", path.display().to_string()),
-            crate::events::EventKind::FileDelete { path } => ("text-red-400", "FILE_DELETE", path.display().to_string()),
-            crate::events::EventKind::ProcessSpawn { cmdline, .. } => ("text-[#888]", "PROC_SPAWN", cmdline.clone()),
-            crate::events::EventKind::ProcessExit { .. } => { continue; } 
-            crate::events::EventKind::NetworkConnection { domain, remote_addr, remote_port, .. } => {
+            crate::events::EventKind::FileRead { path, .. } => {
+                ("text-[#888]", "FILE_READ", path.display().to_string())
+            }
+            crate::events::EventKind::FileWrite { path, .. } => {
+                ("text-[#eaeaea]", "FILE_WRITE", path.display().to_string())
+            }
+            crate::events::EventKind::FileDelete { path } => {
+                ("text-red-400", "FILE_DELETE", path.display().to_string())
+            }
+            crate::events::EventKind::ProcessSpawn { cmdline, .. } => {
+                ("text-[#888]", "PROC_SPAWN", cmdline.clone())
+            }
+            crate::events::EventKind::ProcessExit { .. } => {
+                continue;
+            }
+            crate::events::EventKind::NetworkConnection {
+                domain,
+                remote_addr,
+                remote_port,
+                ..
+            } => {
                 let target = domain.clone().unwrap_or_else(|| remote_addr.clone());
-                ("text-blue-400", "NETWORK_TCP", format!("{}:{}", target, remote_port))
-            },
-            crate::events::EventKind::ShellCommand { command, .. } => ("text-yellow-400", "SHELL_EXEC", command.clone()),
-            crate::events::EventKind::SecretAccess { name, .. } => ("text-red-500", "SECRET_HIT", name.clone()),
-            crate::events::EventKind::EnvVarRead { name, .. } => ("text-cyan-400", "ENV_READ", name.clone()),
-            crate::events::EventKind::ClipboardRead { .. } => ("text-[#888]", "CLIPBOARD", "Read operation".to_string()),
-            crate::events::EventKind::Alert { message, .. } => ("text-orange-500", "ALERT_SYS", message.clone()),
-            _ => ("text-[#555]", "UNKNOWN", "Unknown event".to_string())
+                (
+                    "text-blue-400",
+                    "NETWORK_TCP",
+                    format!("{}:{}", target, remote_port),
+                )
+            }
+            crate::events::EventKind::ShellCommand { command, .. } => {
+                ("text-yellow-400", "SHELL_EXEC", command.clone())
+            }
+            crate::events::EventKind::SecretAccess { name, .. } => {
+                ("text-red-500", "SECRET_HIT", name.clone())
+            }
+            crate::events::EventKind::EnvVarRead { name, .. } => {
+                ("text-cyan-400", "ENV_READ", name.clone())
+            }
+            crate::events::EventKind::ClipboardRead { .. } => {
+                ("text-[#888]", "CLIPBOARD", "Read operation".to_string())
+            }
+            crate::events::EventKind::Alert { message, .. } => {
+                ("text-orange-500", "ALERT_SYS", message.clone())
+            }
+            _ => ("text-[#555]", "UNKNOWN", "Unknown event".to_string()),
         };
 
         let risk_badge = if event.risk_score > 0 {
-            format!("<div class='w-8 text-right text-red-500 font-bold'>+{}</div>", event.risk_score)
+            format!(
+                "<div class='w-8 text-right text-red-500 font-bold'>+{}</div>",
+                event.risk_score
+            )
         } else {
             String::new()
         };
@@ -85,13 +121,14 @@ pub fn build_html_report(metadata: &SessionMetadata, events: &[Event]) -> String
             </div>",
             time_str, color, label, escape_html(&details), risk_badge
         ));
-        
+
         count += 1;
     }
 
     let local_session_time = metadata.timestamp.with_timezone(&Local);
-    
-    let template = format!(r#"<!DOCTYPE html>
+
+    let template = format!(
+        r#"<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -213,10 +250,20 @@ pub fn build_html_report(metadata: &SessionMetadata, events: &[Event]) -> String
         duration = metadata.duration,
         events_count = metadata.event_count,
         risk_score = metadata.risk_score,
-        risk_border = if metadata.risk_score > 50 { "border-t-red-500 border-red-900/40 border-l-[#333] border-r-[#333] border-b-[#333]" } 
-                     else if metadata.risk_score > 20 { "border-t-orange-500 border-orange-900/40 border-l-[#333] border-r-[#333] border-b-[#333]" } 
-                     else { "border-t-blue-500 border-[#333]" },
-        risk_text = if metadata.risk_score > 50 { "text-red-500" } else if metadata.risk_score > 20 { "text-orange-500" } else { "text-white" },
+        risk_border = if metadata.risk_score > 50 {
+            "border-t-red-500 border-red-900/40 border-l-[#333] border-r-[#333] border-b-[#333]"
+        } else if metadata.risk_score > 20 {
+            "border-t-orange-500 border-orange-900/40 border-l-[#333] border-r-[#333] border-b-[#333]"
+        } else {
+            "border-t-blue-500 border-[#333]"
+        },
+        risk_text = if metadata.risk_score > 50 {
+            "text-red-500"
+        } else if metadata.risk_score > 20 {
+            "text-orange-500"
+        } else {
+            "text-white"
+        },
         findings_html = findings_html,
         feed_html = feed_html
     );

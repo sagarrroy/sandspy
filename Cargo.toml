@@ -2,10 +2,10 @@
 name = "sandspy"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.88"
+rust-version = "1.82"
 description = "Real-time security monitor for AI coding agents"
 license = "MIT"
-repository = "https://github.com/user/sandspy"
+repository = "https://github.com/sagarrroy/sandspy"
 keywords = ["security", "ai", "agent", "monitor", "tui"]
 categories = ["command-line-utilities", "development-tools"]
 

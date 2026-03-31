@@ -25,9 +25,11 @@ fn render_file_list(frame: &mut Frame, area: Rect, app: &App) {
     let block = Block::default()
         .title(Span::styled(
             " FILES ",
-            app.style(Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD)),
+            app.style(
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
         ))
         .borders(Borders::ALL)
         .border_type(BorderType::Plain)
@@ -76,9 +78,11 @@ fn render_diff_content(frame: &mut Frame, area: Rect, app: &App) {
     let block = Block::default()
         .title(Span::styled(
             " DIFF ",
-            app.style(Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD)),
+            app.style(
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
         ))
         .borders(Borders::ALL)
         .border_type(BorderType::Plain)
@@ -89,7 +93,13 @@ fn render_diff_content(frame: &mut Frame, area: Rect, app: &App) {
 
     // Find the most recent write event that has a diff_summary
     let last_write = app.events.iter().rev().find(|e| {
-        matches!(&e.kind, EventKind::FileWrite { diff_summary: Some(_), .. })
+        matches!(
+            &e.kind,
+            EventKind::FileWrite {
+                diff_summary: Some(_),
+                ..
+            }
+        )
     });
 
     match last_write {
@@ -101,13 +111,21 @@ fn render_diff_content(frame: &mut Frame, area: Rect, app: &App) {
             frame.render_widget(msg, inner);
         }
         Some(event) => {
-            if let EventKind::FileWrite { path, diff_summary: Some(summary) } = &event.kind {
+            if let EventKind::FileWrite {
+                path,
+                diff_summary: Some(summary),
+            } = &event.kind
+            {
                 // We only have the summary string (e.g. "+15 -3"), not actual content.
                 // Render it as a styled explanation instead.
                 let lines = vec![
                     Line::from(Span::styled(
                         format!("  {}", path.display()),
-                        app.style(Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
+                        app.style(
+                            Style::default()
+                                .fg(Color::White)
+                                .add_modifier(Modifier::BOLD),
+                        ),
                     )),
                     Line::from(""),
                     Line::from(Span::styled(

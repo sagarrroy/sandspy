@@ -178,11 +178,11 @@ fn compute_stats(events: &[Event]) -> ComputedStats {
                 }
             }
             EventKind::SecretAccess { .. } => s.secrets += 1,
-            EventKind::EnvVarRead { sensitive: true, .. } => s.secrets += 1,
+            EventKind::EnvVarRead {
+                sensitive: true, ..
+            } => s.secrets += 1,
             EventKind::ClipboardRead { .. } => s.clipboard_reads += 1,
-            EventKind::Alert { message, .. } if message.contains("temp file") => {
-                s.residual += 1
-            }
+            EventKind::Alert { message, .. } if message.contains("temp file") => s.residual += 1,
             _ => {}
         }
     }
@@ -195,7 +195,11 @@ fn extract_findings(events: &[Event]) -> Vec<Finding> {
 
     for event in events {
         match &event.kind {
-            EventKind::FileRead { path, sensitive: true, .. } => {
+            EventKind::FileRead {
+                path,
+                sensitive: true,
+                ..
+            } => {
                 findings.push(Finding {
                     severity: RiskLevel::Critical,
                     message: format!("{} was read by agent", path.display()),

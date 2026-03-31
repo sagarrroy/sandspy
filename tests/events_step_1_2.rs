@@ -1,6 +1,4 @@
-use sandspy::events::{
-    create_event_bus, Event, EventKind, FileCategory, RiskLevel,
-};
+use sandspy::events::{create_event_bus, Event, EventKind, FileCategory, RiskLevel};
 use std::path::PathBuf;
 
 #[test]

@@ -159,7 +159,11 @@ mod tests {
 
     #[test]
     fn test_event_creation_basics() {
-        let e = Event::new(EventKind::FileRead { path: PathBuf::from("/etc/passwd"), sensitive: true, category: crate::events::FileCategory::Config });
+        let e = Event::new(EventKind::FileRead {
+            path: PathBuf::from("/etc/passwd"),
+            sensitive: true,
+            category: crate::events::FileCategory::Config,
+        });
         assert_eq!(e.risk_score, 0); // Defaults to 0
         match e.kind {
             EventKind::FileRead { path, .. } => {
@@ -171,7 +175,13 @@ mod tests {
 
     #[test]
     fn test_event_with_risk() {
-        let e = Event::with_risk(EventKind::ClipboardRead { content_type: "text".to_string(), contains_secret: true }, 55);
+        let e = Event::with_risk(
+            EventKind::ClipboardRead {
+                content_type: "text".to_string(),
+                contains_secret: true,
+            },
+            55,
+        );
         assert_eq!(e.risk_score, 55);
     }
 }

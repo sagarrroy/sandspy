@@ -27,10 +27,12 @@ pub fn persist_session(metadata: &SessionMetadata, events: &[Event]) -> Result<S
         .with_context(|| format!("failed to create session dir: {}", dir.display()))?;
 
     let metadata_path = dir.join("metadata.json");
-    let metadata_writer = BufWriter::new(
-        File::create(&metadata_path)
-            .with_context(|| format!("failed to create metadata file: {}", metadata_path.display()))?,
-    );
+    let metadata_writer = BufWriter::new(File::create(&metadata_path).with_context(|| {
+        format!(
+            "failed to create metadata file: {}",
+            metadata_path.display()
+        )
+    })?);
     serde_json::to_writer_pretty(metadata_writer, metadata)
         .with_context(|| format!("failed to write metadata: {}", metadata_path.display()))?;
 
@@ -58,12 +60,7 @@ pub async fn list() -> Result<()> {
 
     println!(
         "{:<20}  {:<16}  {:<8}  {:<5}  {:<8}  {}",
-        "session",
-        "agent",
-        "duration",
-        "risk",
-        "events",
-        "timestamp"
+        "session", "agent", "duration", "risk", "events", "timestamp"
     );
     println!("{}", "-".repeat(90));
 
@@ -231,7 +228,9 @@ mod tests {
         let meta = SessionMetadata {
             agent_name: "TestAgent".to_string(),
             pid: Some(1000),
-            timestamp: chrono::Utc.with_ymd_and_hms(2026, 3, 30, 22, 16, 52).unwrap(),
+            timestamp: chrono::Utc
+                .with_ymd_and_hms(2026, 3, 30, 22, 16, 52)
+                .unwrap(),
             duration: 153,
             event_count: 85,
             risk_score: 100,
@@ -239,7 +238,7 @@ mod tests {
 
         let json = serde_json::to_string(&meta).unwrap();
         assert!(json.contains("TestAgent"));
-        
+
         let deserialized: SessionMetadata = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.agent_name, "TestAgent");
         assert_eq!(deserialized.duration, 153);

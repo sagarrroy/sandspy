@@ -2,8 +2,8 @@
 //
 // Renders the same rich post-session summary inside the TUI.
 
-use crate::ui::{app::App, theme};
 use crate::events::RiskLevel;
+use crate::ui::{app::App, theme};
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
@@ -16,9 +16,11 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let block = Block::default()
         .title(Span::styled(
             " SUMMARY ",
-            app.style(Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD)),
+            app.style(
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
         ))
         .borders(Borders::ALL)
         .border_type(BorderType::Plain)
@@ -48,7 +50,12 @@ fn build_summary_lines(app: &App) -> Vec<Line<'static>> {
     let bar_width = 50usize;
     let filled = ((score as f64 / 100.0) * bar_width as f64).round() as usize;
     let empty = bar_width.saturating_sub(filled);
-    let bar_str = format!("[{}{}]  {}/100", "█".repeat(filled), "─".repeat(empty), score);
+    let bar_str = format!(
+        "[{}{}]  {}/100",
+        "█".repeat(filled),
+        "─".repeat(empty),
+        score
+    );
     let risk_str = theme::risk_label_str(score);
 
     let mut lines = vec![
@@ -60,9 +67,30 @@ fn build_summary_lines(app: &App) -> Vec<Line<'static>> {
         Line::from(""),
         section_title("activity", app),
         Line::from(""),
-        kv_line("files   ", &format!("{} read  {} written  {} deleted", s.files_read, s.files_written, s.files_deleted), app),
-        kv_line("network ", &format!("{} connections  ({} unknown)", s.net_connections, s.net_unknown), app),
-        kv_line("commands", &format!("{} executed  ({} dangerous)", s.commands_total, s.commands_dangerous), app),
+        kv_line(
+            "files   ",
+            &format!(
+                "{} read  {} written  {} deleted",
+                s.files_read, s.files_written, s.files_deleted
+            ),
+            app,
+        ),
+        kv_line(
+            "network ",
+            &format!(
+                "{} connections  ({} unknown)",
+                s.net_connections, s.net_unknown
+            ),
+            app,
+        ),
+        kv_line(
+            "commands",
+            &format!(
+                "{} executed  ({} dangerous)",
+                s.commands_total, s.commands_dangerous
+            ),
+            app,
+        ),
         kv_line("secrets ", &format!("{} accessed", s.secrets_accessed), app),
         kv_line("clipboard", &format!("{} reads", s.clipboard_reads), app),
         Line::from(""),
@@ -94,11 +122,17 @@ fn build_summary_lines(app: &App) -> Vec<Line<'static>> {
                 Span::raw("  "),
                 Span::styled(sev, app.style(sev_style)),
                 Span::raw("  "),
-                Span::styled(f.message.clone(), app.style(Style::default().fg(Color::White))),
+                Span::styled(
+                    f.message.clone(),
+                    app.style(Style::default().fg(Color::White)),
+                ),
             ]));
         }
     } else {
-        lines.push(Line::from(Span::styled("  no notable findings", app.style(theme::dim()))));
+        lines.push(Line::from(Span::styled(
+            "  no notable findings",
+            app.style(theme::dim()),
+        )));
     }
 
     lines
@@ -107,15 +141,23 @@ fn build_summary_lines(app: &App) -> Vec<Line<'static>> {
 fn section_title(s: &'static str, app: &App) -> Line<'static> {
     Line::from(Span::styled(
         format!("  {}", s.to_uppercase()),
-        app.style(Style::default()
-            .fg(Color::Yellow)
-            .add_modifier(Modifier::BOLD)),
+        app.style(
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
     ))
 }
 
 fn kv_line(key: &str, value: &str, app: &App) -> Line<'static> {
     Line::from(vec![
-        Span::styled(format!("  {:<10}", key), app.style(Style::default().add_modifier(Modifier::DIM))),
-        Span::styled(value.to_string(), app.style(Style::default().fg(Color::White))),
+        Span::styled(
+            format!("  {:<10}", key),
+            app.style(Style::default().add_modifier(Modifier::DIM)),
+        ),
+        Span::styled(
+            value.to_string(),
+            app.style(Style::default().fg(Color::White)),
+        ),
     ])
 }

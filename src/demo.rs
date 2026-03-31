@@ -4,9 +4,7 @@
 // the same ui::live renderer as real watch mode.
 // Supports --seed for reproducible demos, --scan for instant summary.
 
-use crate::events::{
-    create_event_bus, Event, EventKind, FileCategory, NetCategory, RiskLevel,
-};
+use crate::events::{create_event_bus, Event, EventKind, FileCategory, NetCategory, RiskLevel};
 use crate::ui;
 use anyhow::{Context, Result};
 use chrono::Utc;
@@ -42,30 +40,18 @@ static FILE_WRITES: &[(&str, Option<&str>)] = &[
 ];
 
 static NET_CONNECTIONS: &[(&str, u16, NetCategory, u64, u64)] = &[
-    ("api.anthropic.com", 443, NetCategory::ExpectedApi, 512, 2048),
     (
-        "api.openai.com",
+        "api.anthropic.com",
         443,
         NetCategory::ExpectedApi,
-        341,
-        1024,
+        512,
+        2048,
     ),
+    ("api.openai.com", 443, NetCategory::ExpectedApi, 341, 1024),
     ("sentry.io", 443, NetCategory::Telemetry, 128, 64),
     ("statsig.com", 443, NetCategory::Telemetry, 96, 48),
-    (
-        "amplitude.com",
-        443,
-        NetCategory::Tracking,
-        256,
-        128,
-    ),
-    (
-        "unknown-domain.xyz",
-        8080,
-        NetCategory::Unknown,
-        14336,
-        512,
-    ),
+    ("amplitude.com", 443, NetCategory::Tracking, 256, 128),
+    ("unknown-domain.xyz", 8080, NetCategory::Unknown, 14336, 512),
     ("pastebin.com", 443, NetCategory::Unknown, 4096, 256),
 ];
 
@@ -124,7 +110,10 @@ async fn run_live_stream(events: Vec<(Duration, Event)>, seed: Option<u64>) -> R
         "— simulated 25-second session".dimmed()
     );
     if let Some(s) = seed {
-        println!("  {}", format!("seed: {s}  (replay with --seed {s})").dimmed());
+        println!(
+            "  {}",
+            format!("seed: {s}  (replay with --seed {s})").dimmed()
+        );
     }
     println!();
     println!("  {}", "─".repeat(62).dimmed());
@@ -175,7 +164,8 @@ async fn run_scan_summary(events: Vec<(Duration, Event)>) -> Result<()> {
 // ─── Event generation ────────────────────────────────────────────────────────
 
 fn generate_session(rng: &mut dyn RngCore) -> Result<Vec<(Duration, Event)>> {
-    let dist = WeightedIndex::new(WEIGHTS).context("failed to initialize demo event distribution")?;
+    let dist =
+        WeightedIndex::new(WEIGHTS).context("failed to initialize demo event distribution")?;
     let mut events: Vec<(Duration, Event)> = Vec::new();
 
     // Scatter ~40 events across 25 seconds with weighted timing
@@ -197,29 +187,32 @@ fn generate_session(rng: &mut dyn RngCore) -> Result<Vec<(Duration, Event)>> {
     }
 
     // Always include a couple of spicy events for demo impact
-    events.push((Duration::from_millis(8_000), Event::new(
-        EventKind::FileRead {
+    events.push((
+        Duration::from_millis(8_000),
+        Event::new(EventKind::FileRead {
             path: PathBuf::from(".env"),
             sensitive: true,
             category: FileCategory::Secret,
-        }
-    )));
-    events.push((Duration::from_millis(14_000), Event::new(
-        EventKind::NetworkConnection {
+        }),
+    ));
+    events.push((
+        Duration::from_millis(14_000),
+        Event::new(EventKind::NetworkConnection {
             remote_addr: "unknown-domain.xyz".to_string(),
             remote_port: 8080,
             domain: Some("unknown-domain.xyz".to_string()),
             category: NetCategory::Unknown,
             bytes_sent: 14336,
             bytes_recv: 512,
-        }
-    )));
-    events.push((Duration::from_millis(14_200), Event::new(
-        EventKind::Alert {
+        }),
+    ));
+    events.push((
+        Duration::from_millis(14_200),
+        Event::new(EventKind::Alert {
             message: "unknown network destination detected".to_string(),
             severity: RiskLevel::High,
-        }
-    )));
+        }),
+    ));
 
     events.sort_by_key(|(at, _)| *at);
     Ok(events)
@@ -276,10 +269,21 @@ fn compute_risk(events: &[Event]) -> u32 {
     let mut score = 0u32;
     for e in events {
         score += match &e.kind {
-            EventKind::FileRead { sensitive: true, .. } => 15,
-            EventKind::NetworkConnection { category: NetCategory::Unknown, .. } => 20,
-            EventKind::ShellCommand { risk: RiskLevel::Critical, .. } => 30,
-            EventKind::ShellCommand { risk: RiskLevel::High, .. } => 15,
+            EventKind::FileRead {
+                sensitive: true, ..
+            } => 15,
+            EventKind::NetworkConnection {
+                category: NetCategory::Unknown,
+                ..
+            } => 20,
+            EventKind::ShellCommand {
+                risk: RiskLevel::Critical,
+                ..
+            } => 30,
+            EventKind::ShellCommand {
+                risk: RiskLevel::High,
+                ..
+            } => 15,
             EventKind::Alert { .. } => 10,
             _ => 1,
         };

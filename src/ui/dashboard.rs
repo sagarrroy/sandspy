@@ -37,16 +37,27 @@ fn render_header(frame: &mut Frame, area: Rect, app: &App) {
     let elapsed = app.elapsed_str();
     let status = Span::styled(
         "  ACTIVE",
-        app.style(Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+        app.style(
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        ),
     );
 
     let title_line = Line::from(vec![
         Span::styled(
             format!(" sandspy v{version} "),
-            app.style(Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
+            app.style(
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
         ),
         Span::raw("─".repeat(area.width.saturating_sub(28) as usize)),
-        Span::styled(format!(" {elapsed}"), app.style(Style::default().fg(Color::DarkGray))),
+        Span::styled(
+            format!(" {elapsed}"),
+            app.style(Style::default().fg(Color::DarkGray)),
+        ),
         status,
         Span::raw(" "),
     ]);
@@ -61,14 +72,25 @@ fn render_header(frame: &mut Frame, area: Rect, app: &App) {
     let bar_width = (area.width.saturating_sub(20)) as usize;
     let filled = ((risk as f64 / 100.0) * bar_width as f64).round() as usize;
     let empty = bar_width.saturating_sub(filled);
-    let risk_bar = format!("  risk:  [{}{}]  {}", "█".repeat(filled), "─".repeat(empty), risk);
+    let risk_bar = format!(
+        "  risk:  [{}{}]  {}",
+        "█".repeat(filled),
+        "─".repeat(empty),
+        risk
+    );
     let risk_label = format!("         {}", theme::risk_label_str(risk));
 
     let text = vec![
         title_line,
-        Line::from(Span::styled(&agent_label, app.style(Style::default().fg(Color::White)))),
+        Line::from(Span::styled(
+            &agent_label,
+            app.style(Style::default().fg(Color::White)),
+        )),
         Line::from(Span::styled(&risk_bar, app.style(theme::risk_gauge(risk)))),
-        Line::from(Span::styled(&risk_label, app.style(theme::risk_label(risk)))),
+        Line::from(Span::styled(
+            &risk_label,
+            app.style(theme::risk_label(risk)),
+        )),
     ];
 
     let para = Paragraph::new(text);
@@ -96,7 +118,11 @@ fn stat_block_for(app: &App, title: &'static str) -> Block<'static> {
     Block::default()
         .title(Span::styled(
             format!(" {title} "),
-            app.style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            app.style(
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
         ))
         .borders(Borders::ALL)
         .border_type(BorderType::Plain)
@@ -125,7 +151,10 @@ fn render_network_stats(frame: &mut Frame, area: Rect, app: &App) {
     let text = vec![
         Line::from(vec![
             Span::styled("  total:   ", app.style(theme::dim())),
-            Span::styled(s.net_connections.to_string(), app.style(Style::default().fg(Color::White))),
+            Span::styled(
+                s.net_connections.to_string(),
+                app.style(Style::default().fg(Color::White)),
+            ),
         ]),
         Line::from(vec![
             Span::styled("  trackers:", app.style(theme::dim())),
@@ -224,9 +253,17 @@ fn render_feed(frame: &mut Frame, area: Rect, app: &App) {
         format!(" LIVE FEED  [PAUSED  ↑{offset}  G=live] ")
     };
     let title_style = if is_live {
-        app.style(Style::default().fg(Color::White).add_modifier(Modifier::BOLD))
+        app.style(
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        )
     } else {
-        app.style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+        app.style(
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )
     };
 
     let block = Block::default()
@@ -292,7 +329,11 @@ pub fn format_event_line(event: &Event, no_color: bool, width: usize) -> Line<'s
             EventKind::FileRead { path, .. } => format!("FILE READ {}", path.display()),
             EventKind::FileWrite { path, .. } => format!("FILE WRITE {}", path.display()),
             EventKind::FileDelete { path } => format!("FILE DELETE {}", path.display()),
-            EventKind::NetworkConnection { remote_addr, remote_port, .. } => {
+            EventKind::NetworkConnection {
+                remote_addr,
+                remote_port,
+                ..
+            } => {
                 format!("NET {}:{}", remote_addr, remote_port)
             }
             EventKind::ShellCommand { command, .. } => format!("CMD {}", command),
@@ -306,11 +347,17 @@ pub fn format_event_line(event: &Event, no_color: bool, width: usize) -> Line<'s
         return Line::from(Span::raw(plain));
     }
 
-    let ts = event.timestamp.with_timezone(&Local).format("%H:%M:%S").to_string();
+    let ts = event
+        .timestamp
+        .with_timezone(&Local)
+        .format("%H:%M:%S")
+        .to_string();
     let ts_span = Span::styled(ts, theme::dim());
 
     match &event.kind {
-        EventKind::FileRead { path, sensitive, .. } => {
+        EventKind::FileRead {
+            path, sensitive, ..
+        } => {
             let label = if *sensitive {
                 Span::styled("SENSITIVE", theme::label_sensitive())
             } else {
@@ -321,7 +368,10 @@ pub fn format_event_line(event: &Event, no_color: bool, width: usize) -> Line<'s
                 Span::raw("  "),
                 Span::styled("READ ", theme::tag_read()),
                 Span::raw("  "),
-                Span::styled(truncate_str(&path.display().to_string(), content_width), Style::default().fg(Color::White)),
+                Span::styled(
+                    truncate_str(&path.display().to_string(), content_width),
+                    Style::default().fg(Color::White),
+                ),
                 Span::raw("  "),
                 label,
             ])
@@ -333,7 +383,13 @@ pub fn format_event_line(event: &Event, no_color: bool, width: usize) -> Line<'s
                 Span::raw("  "),
                 Span::styled("WRITE", theme::tag_write()),
                 Span::raw("  "),
-                Span::styled(truncate_str(&path.display().to_string(), content_width.saturating_sub(12)), Style::default().fg(Color::White)),
+                Span::styled(
+                    truncate_str(
+                        &path.display().to_string(),
+                        content_width.saturating_sub(12),
+                    ),
+                    Style::default().fg(Color::White),
+                ),
                 Span::raw("  "),
                 Span::styled(diff, theme::tag_write()),
             ])
@@ -343,7 +399,10 @@ pub fn format_event_line(event: &Event, no_color: bool, width: usize) -> Line<'s
             Span::raw("  "),
             Span::styled("DEL  ", theme::tag_delete()),
             Span::raw("  "),
-            Span::styled(truncate_str(&path.display().to_string(), content_width), theme::tag_delete()),
+            Span::styled(
+                truncate_str(&path.display().to_string(), content_width),
+                theme::tag_delete(),
+            ),
         ]),
         EventKind::NetworkConnection {
             remote_addr,
@@ -370,7 +429,10 @@ pub fn format_event_line(event: &Event, no_color: bool, width: usize) -> Line<'s
                 Span::raw("  "),
                 Span::styled("NET  ", theme::tag_net()),
                 Span::raw("  "),
-                Span::styled(truncate_str(&host, content_width.saturating_sub(20)), Style::default().fg(Color::White)),
+                Span::styled(
+                    truncate_str(&host, content_width.saturating_sub(20)),
+                    Style::default().fg(Color::White),
+                ),
                 Span::raw("  "),
                 Span::styled(format!("{:>9}", owner), theme::dim()),
                 Span::raw("  "),
@@ -389,7 +451,10 @@ pub fn format_event_line(event: &Event, no_color: bool, width: usize) -> Line<'s
                 Span::raw("  "),
                 Span::styled("CMD  ", theme::tag_cmd()),
                 Span::raw("  "),
-                Span::styled(truncate_str(command, content_width.saturating_sub(10)), Style::default().fg(Color::White)),
+                Span::styled(
+                    truncate_str(command, content_width.saturating_sub(10)),
+                    Style::default().fg(Color::White),
+                ),
                 Span::raw("  "),
                 Span::styled(label_text, label_style),
             ])
@@ -399,7 +464,10 @@ pub fn format_event_line(event: &Event, no_color: bool, width: usize) -> Line<'s
             Span::raw("  "),
             Span::styled("SECRET", theme::tag_secret()),
             Span::raw(" "),
-            Span::styled(truncate_str(name, content_width), Style::default().fg(Color::Red)),
+            Span::styled(
+                truncate_str(name, content_width),
+                Style::default().fg(Color::Red),
+            ),
             Span::raw("  "),
             Span::styled("HIGH", theme::label_high()),
         ]),
@@ -414,12 +482,17 @@ pub fn format_event_line(event: &Event, no_color: bool, width: usize) -> Line<'s
                 Span::raw("  "),
                 Span::styled("ENV  ", theme::tag_env()),
                 Span::raw("  "),
-                Span::styled(truncate_str(name, content_width), Style::default().fg(Color::White)),
+                Span::styled(
+                    truncate_str(name, content_width),
+                    Style::default().fg(Color::White),
+                ),
                 Span::raw("  "),
                 label,
             ])
         }
-        EventKind::ClipboardRead { contains_secret, .. } => {
+        EventKind::ClipboardRead {
+            contains_secret, ..
+        } => {
             let label = if *contains_secret {
                 Span::styled("SENSITIVE", theme::label_sensitive())
             } else {
@@ -448,7 +521,9 @@ pub fn format_event_line(event: &Event, no_color: bool, width: usize) -> Line<'s
                 Span::styled(truncate_str(message, content_width), msg_style),
             ])
         }
-        EventKind::ProcessSpawn { name, pid, cmdline, .. } => {
+        EventKind::ProcessSpawn {
+            name, pid, cmdline, ..
+        } => {
             let desc = if cmdline.len() > 40 {
                 format!("{name} (pid {pid})")
             } else {

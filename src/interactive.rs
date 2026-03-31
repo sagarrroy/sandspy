@@ -13,7 +13,6 @@ use crossterm::{
     terminal,
 };
 
-
 /// Run interactive mode. Called when sandspy has no subcommand.
 pub async fn run() -> Result<()> {
     print_banner();
@@ -94,29 +93,22 @@ fn print_agent_list(agents: &[crate::events::AgentInfo]) {
 }
 
 fn print_no_agents() {
-    println!(
-        "  {}  no running AI agents detected\n",
-        "○".yellow()
-    );
+    println!("  {}  no running AI agents detected\n", "○".yellow());
     println!("  {}", "usage".bold().white());
     println!();
 
     let cmds = [
-        ("sandspy watch \"claude-code\"", "monitor a launched command"),
         (
-            "sandspy attach --name cursor",
-            "attach to a running agent",
+            "sandspy watch \"claude-code\"",
+            "monitor a launched command",
         ),
+        ("sandspy attach --name cursor", "attach to a running agent"),
         ("sandspy demo", "run a simulated 25-second session"),
         ("sandspy daemon start", "background monitoring mode"),
     ];
 
     for (cmd, desc) in &cmds {
-        println!(
-            "    {}   {}",
-            cmd.bold().white(),
-            desc.dimmed()
-        );
+        println!("    {}   {}", cmd.bold().white(), desc.dimmed());
     }
 
     println!();

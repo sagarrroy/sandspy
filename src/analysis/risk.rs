@@ -30,8 +30,7 @@ impl RiskScorer {
 
     /// Current risk score, 0-100.
     pub fn score(&self) -> u32 {
-        ((self.total_points as f64 / NORMALIZATION_BASELINE as f64) * 100.0)
-            .min(100.0) as u32
+        ((self.total_points as f64 / NORMALIZATION_BASELINE as f64) * 100.0).min(100.0) as u32
     }
 
     /// Current risk level.
@@ -90,9 +89,7 @@ impl RiskScorer {
                 }
             }
             EventKind::FileRead {
-                path,
-                sensitive,
-                ..
+                path, sensitive, ..
             } => {
                 if *sensitive && is_ssh_or_pem(path) {
                     alerts.push(Event::new(EventKind::Alert {
@@ -110,21 +107,53 @@ impl RiskScorer {
 
     fn points_for(kind: &EventKind) -> u32 {
         match kind {
-            EventKind::FileRead { sensitive: true, .. } => 15,
-            EventKind::FileRead { sensitive: false, .. } => 0,
+            EventKind::FileRead {
+                sensitive: true, ..
+            } => 15,
+            EventKind::FileRead {
+                sensitive: false, ..
+            } => 0,
             EventKind::FileWrite { .. } => 2,
             EventKind::FileDelete { .. } => 5,
-            EventKind::NetworkConnection { category: NetCategory::Unknown, .. } => 25,
-            EventKind::NetworkConnection { category: NetCategory::Telemetry, .. } => 5,
-            EventKind::NetworkConnection { category: NetCategory::Tracking, .. } => 5,
-            EventKind::NetworkConnection { category: NetCategory::ExpectedApi, .. } => 0,
-            EventKind::ShellCommand { risk: RiskLevel::Critical, .. } => 30,
-            EventKind::ShellCommand { risk: RiskLevel::High, .. } => 15,
-            EventKind::ShellCommand { risk: RiskLevel::Medium, .. } => 5,
-            EventKind::ShellCommand { risk: RiskLevel::Low, .. } => 0,
+            EventKind::NetworkConnection {
+                category: NetCategory::Unknown,
+                ..
+            } => 25,
+            EventKind::NetworkConnection {
+                category: NetCategory::Telemetry,
+                ..
+            } => 5,
+            EventKind::NetworkConnection {
+                category: NetCategory::Tracking,
+                ..
+            } => 5,
+            EventKind::NetworkConnection {
+                category: NetCategory::ExpectedApi,
+                ..
+            } => 0,
+            EventKind::ShellCommand {
+                risk: RiskLevel::Critical,
+                ..
+            } => 30,
+            EventKind::ShellCommand {
+                risk: RiskLevel::High,
+                ..
+            } => 15,
+            EventKind::ShellCommand {
+                risk: RiskLevel::Medium,
+                ..
+            } => 5,
+            EventKind::ShellCommand {
+                risk: RiskLevel::Low,
+                ..
+            } => 0,
             EventKind::SecretAccess { .. } => 20,
-            EventKind::EnvVarRead { sensitive: true, .. } => 15,
-            EventKind::EnvVarRead { sensitive: false, .. } => 0,
+            EventKind::EnvVarRead {
+                sensitive: true, ..
+            } => 15,
+            EventKind::EnvVarRead {
+                sensitive: false, ..
+            } => 0,
             EventKind::ClipboardRead { .. } => 10,
             EventKind::ClipboardWrite { .. } => 0,
             EventKind::Alert { .. } => 0, // alerts don't add to score
@@ -136,6 +165,9 @@ impl RiskScorer {
 }
 
 fn is_ssh_or_pem(path: &Path) -> bool {
-    let normalized = path.to_string_lossy().replace('\\', "/").to_ascii_lowercase();
+    let normalized = path
+        .to_string_lossy()
+        .replace('\\', "/")
+        .to_ascii_lowercase();
     normalized.contains("/.ssh/") || normalized.ends_with(".pem")
 }

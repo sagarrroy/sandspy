@@ -19,7 +19,10 @@ pub async fn run(
     Ok(())
 }
 
-async fn emit_temp_residue_events(tx: &mpsc::Sender<Event>, session_start: SystemTime) -> Result<()> {
+async fn emit_temp_residue_events(
+    tx: &mpsc::Sender<Event>,
+    session_start: SystemTime,
+) -> Result<()> {
     let temp_dirs = temp_scan_roots();
     let mut residue_count = 0usize;
 
@@ -44,7 +47,9 @@ async fn emit_temp_residue_events(tx: &mpsc::Sender<Event>, session_start: Syste
 
     if residue_count > 0 {
         let alert = Event::new(EventKind::Alert {
-            message: format!("memory residue scan found {residue_count} temp files created during session"),
+            message: format!(
+                "memory residue scan found {residue_count} temp files created during session"
+            ),
             severity: RiskLevel::Medium,
         });
 
@@ -54,7 +59,10 @@ async fn emit_temp_residue_events(tx: &mpsc::Sender<Event>, session_start: Syste
     Ok(())
 }
 
-async fn emit_orphan_process_events(tx: &mpsc::Sender<Event>, seen_pids: &HashSet<u32>) -> Result<()> {
+async fn emit_orphan_process_events(
+    tx: &mpsc::Sender<Event>,
+    seen_pids: &HashSet<u32>,
+) -> Result<()> {
     if seen_pids.is_empty() {
         return Ok(());
     }
@@ -119,14 +127,22 @@ fn collect_recent_temp_files(root: &Path, session_start: SystemTime) -> Vec<Path
     files
 }
 
-fn collect_recent_files_recursive(path: &Path, session_start: SystemTime, files: &mut Vec<PathBuf>) {
+fn collect_recent_files_recursive(
+    path: &Path,
+    session_start: SystemTime,
+    files: &mut Vec<PathBuf>,
+) {
     let metadata = match fs::metadata(path) {
         Ok(value) => value,
         Err(_) => return,
     };
 
     if metadata.is_file() {
-        if metadata.modified().map(|time| time >= session_start).unwrap_or(false) {
+        if metadata
+            .modified()
+            .map(|time| time >= session_start)
+            .unwrap_or(false)
+        {
             files.push(path.to_path_buf());
         }
         return;
