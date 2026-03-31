@@ -49,7 +49,23 @@ sandspy is a lightweight Rust binary. Install it globally via Cargo:
 cargo install sandspy
 ```
 
-_(Requires Rust 1.88+)_
+_(Requires Rust 1.82+)_
+
+**Or build from source:**
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/sagarrroy/sandspy.git
+cd sandspy
+
+# 2. Build and install globally  
+cargo install --path . --force
+
+# 3. Verify it works
+sandspy --version
+```
+
+> You'll need the [Rust toolchain](https://rustup.rs/) installed. Running `cargo install --path .` compiles an optimized release binary and places it in your `$PATH` automatically.
 
 ### Commands
 
