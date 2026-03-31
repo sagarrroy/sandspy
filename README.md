@@ -2,6 +2,7 @@
   <h1>sandspy</h1>
   <p><strong>Zero-Friction Security Telemetry for Autonomous AI Agents</strong></p>
   
+  <a href="https://crates.io/crates/sandspy"><img src="https://img.shields.io/crates/v/sandspy.svg?style=for-the-badge&color=2BB4AB" alt="Crates.io"></a>
   <a href="https://github.com/sagarrroy/sandspy/actions"><img src="https://img.shields.io/github/actions/workflow/status/sagarrroy/sandspy/ci.yml?branch=main&style=for-the-badge&color=2BB4AB" alt="CI Status"></a>
   <a href="https://github.com/sagarrroy/sandspy/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg?style=for-the-badge&color=2BB4AB" alt="License"></a>
   <img src="https://img.shields.io/badge/Discord-icedcappus-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord: icedcappus">
