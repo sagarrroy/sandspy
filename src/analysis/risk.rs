@@ -29,7 +29,6 @@ impl Default for RiskScorer {
 }
 
 impl RiskScorer {
-
     /// Process an event and return the updated risk score (0-100).
     pub fn process(&mut self, event: &Event) -> u32 {
         let points = Self::points_for(&event.kind);
