@@ -117,10 +117,10 @@ pub async fn watch() -> Result<()> {
         .with_context(|| format!("failed to open log: {}", log_path.display()))?;
     let reader = BufReader::new(file);
     let mut names = Vec::<String>::new();
-    let lines = reader.lines().flatten().collect::<Vec<_>>();
+    let lines: Vec<String> = reader.lines().map_while(|l| l.ok()).collect();
 
     for line in lines.iter().rev().take(500) {
-        if let Some(name) = extract_agent_name(&line) {
+        if let Some(name) = extract_agent_name(line) {
             if !names.iter().any(|existing| existing == &name) {
                 names.push(name);
             }

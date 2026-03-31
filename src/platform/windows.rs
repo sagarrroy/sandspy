@@ -17,8 +17,10 @@ pub fn process_tree(pid: u32) -> Vec<u32> {
     }
 
     let mut children = Vec::new();
-    let mut entry = PROCESSENTRY32W::default();
-    entry.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
+    let mut entry = PROCESSENTRY32W {
+        dwSize: std::mem::size_of::<PROCESSENTRY32W>() as u32,
+        ..Default::default()
+    };
 
     let mut has_entry = unsafe { Process32FirstW(handle, &mut entry).is_ok() };
     while has_entry {

@@ -11,7 +11,7 @@
 
 ### The Problem
 
-Autonomous AI coding agents like Cursor, Windsurf, Claude Code, and Aider accelerate our workflows. However, these tools require local shell execution and extensive filesystem access to function optimally, and new engineers and vibe coders are often oblivious to the issues that can happen if these agents are left unchecked.
+Autonomous AI coding agents like Cursor, Windsurf, Claude Code, and Aider accelerate are being used exponentially, by almost everyone. However, these tools require local shell execution and extensive filesystem access to function optimally, and new engineers and vibe coders are often oblivious to the issues that can happen if these agents are left unchecked.
 
 **This introduces an enormous blind spot.** When an agent is navigating your machine at 1,000 WPM, it becomes nearly impossible to verify structurally safe behavior:
 
@@ -58,7 +58,7 @@ _(Requires Rust 1.82+)_
 git clone https://github.com/sagarrroy/sandspy.git
 cd sandspy
 
-# 2. Build and install globally  
+# 2. Build and install globally
 cargo install --path . --force
 
 # 3. Verify it works

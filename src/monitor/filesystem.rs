@@ -65,10 +65,7 @@ pub async fn run(tx: mpsc::Sender<Event>, pids: PidSet) -> Result<()> {
         let paths_to_process: Vec<_> = event
             .paths
             .iter()
-            .filter(|p| match last_emit.get(*p) {
-                Some(t) if now.duration_since(*t) < debounce => false,
-                _ => true,
-            })
+            .filter(|p| !matches!(last_emit.get(*p), Some(t) if now.duration_since(*t) < debounce))
             .cloned()
             .collect();
 
@@ -213,7 +210,7 @@ async fn emit_secret_access_events_with_source(
             let event = Event::with_risk(
                 EventKind::SecretAccess {
                     name: format!("sensitive file: {fname}"),
-                    source: source.clone(),
+                    source,
                 },
                 20,
             );
@@ -247,7 +244,7 @@ async fn emit_secret_access_events_with_source(
         let event = Event::with_risk(
             EventKind::SecretAccess {
                 name: finding.pattern_name,
-                source: source.clone(),
+                source,
             },
             risk,
         );

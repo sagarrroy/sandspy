@@ -59,8 +59,8 @@ pub async fn list() -> Result<()> {
     }
 
     println!(
-        "{:<20}  {:<16}  {:<8}  {:<5}  {:<8}  {}",
-        "session", "agent", "duration", "risk", "events", "timestamp"
+        "{:<20}  {:<16}  {:<8}  {:<5}  {:<8}  TIMESTAMP",
+        "SESSION", "AGENT", "DURATION", "RISK", "EVENTS"
     );
     println!("{}", "-".repeat(90));
 

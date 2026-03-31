@@ -51,6 +51,7 @@ fn test_end_to_end_daemon_telemetry() {
 
     // Kill it just in case it didn't cleanly exit (avoid hanging the test suite)
     let _ = sandspy_proc.kill();
+    let _ = sandspy_proc.wait(); // Reap the child to avoid zombie process
 
     // 5. Verify the dummy_secret.env was created
     assert!(

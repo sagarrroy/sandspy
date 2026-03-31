@@ -50,7 +50,7 @@ pub async fn run(tx: mpsc::Sender<Event>, pids: PidSet) -> Result<()> {
             let env_vars: Vec<(String, bool)> = process
                 .environ()
                 .iter()
-                .filter_map(|entry| parse_env_entry(entry))
+                .filter_map(parse_env_entry)
                 .filter(|(name, _)| is_sensitive_env_name(name))
                 .collect();
 

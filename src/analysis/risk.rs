@@ -20,6 +20,15 @@ impl RiskScorer {
             unknown_data_alerted: false,
         }
     }
+}
+
+impl Default for RiskScorer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl RiskScorer {
 
     /// Process an event and return the updated risk score (0-100).
     pub fn process(&mut self, event: &Event) -> u32 {

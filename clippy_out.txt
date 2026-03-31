@@ -1,0 +1,59 @@
+﻿cargo :     Checking sandspy v0.1.0 
+(C:\Users\sagar\Desktop\projects\sandspy)
+At line:1 char:1
++ cargo clippy --all-targets -- -D warnings 2>&1 | Out-File -Encoding 
+u ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (    Checking sa...ojects\ 
+   sandspy):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+error: spawned process is never `wait()`ed on
+  --> tests\integration_test.rs:36:28
+   |
+36 |       let mut sandspy_proc = Command::new(sandspy_exe)
+   |  ____________________________^
+37 | |         .arg("watch")
+38 | |         .arg("--pid")
+39 | |         .arg(dummy_pid.to_string())
+...  |
+42 | |         .spawn()
+43 | |         .expect("failed to spawn sandspy daemon");
+   | |_________________________________________________^
+   |
+   = help: consider calling `.wait()`
+   = note: not doing so might leave behind zombie processes
+   = note: see 
+https://doc.rust-lang.org/stable/std/process/struct.Child.html#warning
+   = help: for further information visit https://rust-lang.github.io/ru
+st-clippy/rust-1.94.0/index.html#zombie_processes
+   = note: `-D clippy::zombie-processes` implied by `-D warnings`
+   = help: to override `-D warnings` add 
+`#[allow(clippy::zombie_processes)]`
+
+error: could not compile `sandspy` (test "integration_test") due to 1 
+previous error
+warning: build failed, waiting for other jobs to finish...
+error: literal with an empty format string
+  --> src\history.rs:63:59
+   |
+63 |         "SESSION", "AGENT", "DURATION", "RISK", "EVENTS", 
+"TIMESTAMP"
+   |                                                           
+^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/ru
+st-clippy/rust-1.94.0/index.html#print_literal
+   = note: `-D clippy::print-literal` implied by `-D warnings`
+   = help: to override `-D warnings` add 
+`#[allow(clippy::print_literal)]`
+help: try
+   |
+62 ~         "{:<20}  {:<16}  {:<8}  {:<5}  {:<8}  TIMESTAMP",
+63 ~         "SESSION", "AGENT", "DURATION", "RISK", "EVENTS"
+   |
+
+error: could not compile `sandspy` (bin "sandspy") due to 1 previous 
+error
+error: could not compile `sandspy` (bin "sandspy" test) due to 1 
+previous error
