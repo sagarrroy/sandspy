@@ -23,3 +23,6 @@ technical_implementation.md
 implementation_plan.md
 technical_bible.md
 AGENT_HANDOFF.md
+handoff.md
+sandspy_rogue_simulation.ps1
+tests.log

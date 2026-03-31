@@ -9,9 +9,11 @@
 ---
 
 ### The Problem
-We all love using autonomous AI coding agents like Cursor, Windsurf, Claude Code, and Aider to accelerate our workflows. However, these tools require local shell execution and extensive filesystem access to function optimally. 
+
+We all love using autonomous AI coding agents like Cursor, Windsurf, Claude Code, and Aider to accelerate our workflows. However, these tools require local shell execution and extensive filesystem access to function optimally.
 
 **This introduces an enormous blind spot.** When an agent is navigating your machine at 1,000 WPM, it becomes nearly impossible to verify structurally safe behavior:
+
 - What `.env` config files or SSH keys did it read?
 - Did it accidentally copy your Stripe tokens into the systemic clipboard?
 - Did a community script or CLI tool ping an unknown external telemetry server?
@@ -22,7 +24,7 @@ We all love using autonomous AI coding agents like Cursor, Windsurf, Claude Code
 
 <div align="center">
   <!-- TODO: Replace with actual asset path before launch -->
-  <img src="https://raw.githubusercontent.com/user/sandspy/main/assets/dashboard.gif" alt="Sandspy TUI Dashboard in Action" width="800" style="border: 1px solid #333; border-radius: 4px;">
+  <img src="https://raw.githubusercontent.com/user/sandspy/main/assets/dashboard.png" alt="Sandspy TUI Dashboard in Action" width="800" style="border: 1px solid #333; border-radius: 4px;">
 </div>
 
 <br>
@@ -40,38 +42,63 @@ We all love using autonomous AI coding agents like Cursor, Windsurf, Claude Code
 
 ### Installation
 
-Sandspy is a lightweight Rust binary. Since it is currently natively hosted on GitHub, install it directly like this:
+Sandspy is a lightweight Rust binary. Install it globally via Cargo:
 
 ```bash
-cargo install --git https://github.com/YOUR_USERNAME/sandspy.git
+cargo install sandspy
 ```
-*(Requires Rust 1.88+)*
 
-### 1. The Real-Time Dashboard
-To open the 60fps telemetry terminal UI and automatically hook into the nearest AI agent process:
+_(Requires Rust 1.88+)_
+
+### Commands
+
+| Command                | Description                                                  |
+| ---------------------- | ------------------------------------------------------------ |
+| `sandspy watch`        | Auto-detect and monitor the nearest running AI agent         |
+| `sandspy attach <PID>` | Manually attach to a specific running process by PID         |
+| `sandspy demo`         | Run a simulated sandspy session (great for exploring the UI) |
+| `sandspy report`       | View, generate, or export a report for a recorded session    |
+| `sandspy history`      | Browse all previously recorded audit sessions                |
+| `sandspy daemon`       | Manage Sandspy running as a persistent background service    |
+| `sandspy profiles`     | List and manage loaded agent profiles                        |
+
+### Global Options
+
+| Flag                      | Description                                                        |
+| ------------------------- | ------------------------------------------------------------------ |
+| `-d, --dashboard`         | Launch the full 60fps ratatui TUI dashboard instead of live stream |
+| `-v, --verbosity <LEVEL>` | Set verbosity: `low`, `medium`, `high`, `all` (default: `low`)     |
+| `-o, --output <FILE>`     | Write the raw session log to a file                                |
+| `--profile <NAME>`        | Force a specific agent profile instead of auto-detecting           |
+| `--no-color`              | Disable colored output for CI/piping                               |
+| `--json`                  | Stream all events as JSON lines (JSONL) to stdout                  |
+
+### Examples
 
 ```bash
+# Auto-detect and watch with the TUI dashboard
 sandspy watch --dashboard
-```
 
-### 2. The Headless Daemon
-To run Sandspy silently in the background (perfect for continuous monitoring):
+# Run silently in background, writing events to a log
+sandspy watch --json -o session.jsonl
 
-```bash
-sandspy watch
-```
+# Attach to a specific PID manually
+sandspy attach 12345
 
-### 3. Generate HTML Audit Reports
-After an agent session cleanly exits, generate a beautiful HTML report to review exactly what files and networks it touched.
+# View your last 10 sessions
+sandspy history
 
-```bash
-sandspy history                  # See recent sessions
-sandspy report --session <ID> --format Html
+# Generate an HTML audit report for a specific session
+sandspy report --session 2026-03-30-221652 --format Html
+
+# Run the demo to explore the UI without a real agent
+sandspy demo --dashboard
 ```
 
 ## 🏗️ Under The Hood
 
-Sandspy is designed for raw performance and enterprise-grade memory safety. 
+Sandspy is designed for raw performance and enterprise-grade memory safety.
+
 - **Lock-Free Event Bus**: Powered by `tokio` multi-threaded MPSC channels handling >10,000 events/sec without blocking your terminal.
 - **Cross-Platform**: Operates flawlessly across Windows (`Win32` / Native APIs), Linux (`procfs`), and macOS.
 - **Zero-Friction Engine**: Does not require root elevation (`sudo`) or complex kernel drivers to observe process network tables. It safely hooks from standard user-space.
@@ -81,13 +108,28 @@ Sandspy is designed for raw performance and enterprise-grade memory safety.
 Sandspy is completely open-source and we would **love** your help to make it better! We want to support every AI agent in the world, and we need the community to help us establish baseline security.
 
 Here are ways you can easily contribute today:
+
 1. **Add an Agent Profile**: Did we miss an AI agent? You can add support for it in 2 minutes without knowing Rust. Just create a simple TOML configuration file in the `profiles/` directory. Check out [CONTRIBUTING_PROFILES.md](./CONTRIBUTING_PROFILES.md) for a quick guide!
 2. **Improve OS Abstractions**: Expand our memory hooks for macOS and Linux.
 3. **Regex Expansion**: Help us build out more complex Regex algorithms in `src/analysis/secrets.rs` to detect obscure database connection strings.
 
 Please check out our detailed [CONTRIBUTING.md](./CONTRIBUTING.md) to get started!
 
+## 👋 About the Author & Why I Built This
+
+I'm a college freshman, and to be completely transparent—this is my very first Open Source contribution!
+
+This project was ~90% "vibe-coded" and built alongside AI tools (like Antigravity) over the span of about 3 days, following 2 days of architectural planning. I'm currently strapped for cash and relying entirely on the free tiers of these AI tools to learn and build. I recently saw that Anthropic was generously offering premium plans to developers who build great stuff for the OSS community. That genuinely inspired me. I've benefited from free, open-source software my entire life, and I finally wanted to step up and give something back.
+
+I am still actively learning Rust. While I think the core idea of Sandspy has massive potential, I simply lack the advanced systems knowledge (and the AI resources) to scale it to its absolute limits entirely on my own right now.
+
+If you find this concept cool, **please leave a star ⭐**, open an issue, or even submit a Pull Request! I would love for experienced developers to interact with this, improve the codebase, and help me learn in the process. I promise to keep working hard to build free, useful stuff for everyone.
+
+> [!WARNING]
+> **A quick note on OS Support:** Since I built and tested this entirely on a Windows machine, the Linux and macOS telemetry hooks haven't been aggressively stress-tested by me personally yet. If you run into any weird bugs on an Apple Silicon Mac or Ubuntu, please let me know! I'll do my absolute best to track down the fix.
+
 ---
+
 <div align="center">
   <i>"Trust your agents. Verify their execution."</i>
 </div>
