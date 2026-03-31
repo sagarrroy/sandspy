@@ -82,14 +82,14 @@ sandspy --version
 
 ### Global Options
 
-| Flag                      | Description                                                        |
-| ------------------------- | ------------------------------------------------------------------ |
-| `-d, --dashboard`         | Launch the full 60fps ratatui TUI dashboard instead of live stream |
-| `-v, --verbosity <LEVEL>` | Set verbosity: `low`, `medium`, `high`, `all` (default: `low`)     |
-| `-o, --output <FILE>`     | Write the raw session log to a file                                |
-| `--profile <NAME>`        | Force a specific agent profile instead of auto-detecting           |
-| `--no-color`              | Disable colored output for CI/piping                               |
-| `--json`                  | Stream all events as JSON lines (JSONL) to stdout                  |
+| Flag                      | Description                                                    |
+| ------------------------- | -------------------------------------------------------------- |
+| `-d, --dashboard`         | Launch the full ratatui TUI dashboard instead of live stream   |
+| `-v, --verbosity <LEVEL>` | Set verbosity: `low`, `medium`, `high`, `all` (default: `low`) |
+| `-o, --output <FILE>`     | Write the raw session log to a file                            |
+| `--profile <NAME>`        | Force a specific agent profile instead of auto-detecting       |
+| `--no-color`              | Disable colored output for CI/piping                           |
+| `--json`                  | Stream all events as JSON lines (JSONL) to stdout              |
 
 ### Examples
 
@@ -137,7 +137,7 @@ Please check out our detailed [CONTRIBUTING.md](./CONTRIBUTING.md) to get starte
 
 I'm a college freshman, and to be completely transparent—this is my very first Open Source contribution!
 
-This project was ~90% "vibe-coded" and built alongside all free AI tools (like Antigravity) over the span of about 3 days, following 2 days of architectural planning. I'm completely broke and relying entirely on the free tiers of these AI tools to learn and build. I recently saw that Anthropic was generously offering premium plans to developers who build great stuff for the OSS community, and that genuinely inspired me cuz ive always wanted to have contributions on my name. I've benefited from free, open-source software my entire life, and I finally wanted to step up and give something back.
+This project was built with the help of free AI tools over the span of about 3 days, following 2 days of architectural planning. I'm completely broke and relying on the free tiers of these AI tools to learn and build. I recently saw that Anthropic was generously offering premium plans to developers who build great stuff for the OSS community, and that genuinely inspired me cuz ive always wanted to contribute to open source. I've benefited from free, open-source software my entire life, and I finally wanted to step up and give something back.
 
 I am still actively learning Rust. While I think the core idea of sandspy has massive potential, I simply lack the advanced systems knowledge (and the AI resources) to scale it to its absolute limits entirely on my own right now. I know I sound naive (i am) but I'm trying my best to learn and improve.
 
