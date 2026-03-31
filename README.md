@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>S A N D S P Y</h1>
+  <h1>sandspy</h1>
   <p><strong>Zero-Friction Security Telemetry for Autonomous AI Agents</strong></p>
   
   <a href="https://github.com/user/sandspy/actions"><img src="https://img.shields.io/github/actions/workflow/status/user/sandspy/ci.yml?branch=main&style=for-the-badge&color=2BB4AB" alt="CI Status"></a>
@@ -24,7 +24,7 @@ We all love using autonomous AI coding agents like Cursor, Windsurf, Claude Code
 
 <div align="center">
   <!-- TODO: Replace with actual asset path before launch -->
-  <img src="https://raw.githubusercontent.com/user/sandspy/main/assets/dashboard.png" alt="Sandspy TUI Dashboard in Action" width="800" style="border: 1px solid #333; border-radius: 4px;">
+  <img src="https://raw.githubusercontent.com/sagarrroy/sandspy/main/assets/dashboard.png" alt="Sandspy TUI Dashboard in Action" width="800" style="border: 1px solid #333; border-radius: 4px;">
 </div>
 
 <br>
