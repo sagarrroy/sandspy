@@ -40,6 +40,18 @@ Autonomous AI coding agents like Cursor, Windsurf, Claude Code, and Aider accele
 - 🛡️ **Self-Healing Daemon**: If the AI process exits, the sandspy daemon silently resets and waits in an infinite loop to seamlessly re-attach to the next spawned process.
 - 📊 **Beautiful HTML Audits**: Generates stunning, minimalist HTML executive summaries for your team to review post-session telemetry.
 
+## 🤖 Supported Agents & Editors
+
+sandspy operates seamlessly with any local process, but it is heavily optimized out-of-the-box to detect, hook, and filter noise specifically for the most powerful AI tools:
+
+- **Cursor**
+- **Windsurf**
+- **Aider**
+- **Claude Code**
+- **Roo Code / Cline**
+
+> *Don't see your favorite agent? It takes literally 2 minutes to define a new agent profile in a `TOML` file. [Check out the guide!](./CONTRIBUTING_PROFILES.md)*
+
 ## 🚀 Quick Start
 
 ### Installation
@@ -123,7 +135,7 @@ sandspy is designed for raw performance and enterprise-grade memory safety.
 
 ## ❤️ Contributing
 
-sandspy is completely open-source and i would **love** your help to make it better! We want to support every AI agent in the world, and we need the community to help us establish baseline security.
+sandspy is open-source and i would **love** your help to make it better! We want to support every AI agent in the world, and we need the community to help us establish baseline security.
 
 Here are ways you can easily contribute today:
 
@@ -137,9 +149,9 @@ Please check out our detailed [CONTRIBUTING.md](./CONTRIBUTING.md) to get starte
 
 I'm a college freshman, and to be completely transparent—this is my very first Open Source contribution!
 
-This project was built with the help of free AI tools over the span of about 3 days, following 2 days of architectural planning. I'm completely broke and relying on the free tiers of these AI tools to learn and build. I recently saw that Anthropic was generously offering premium plans to developers who build great stuff for the OSS community, and that genuinely inspired me cuz ive always wanted to contribute to open source. I've benefited from free, open-source software my entire life, and I finally wanted to step up and give something back.
+This project was built over the span of about 3 days, following 2 days of architectural planning. I recently saw that Anthropic was generously offering premium plans to developers who build great stuff for the OSS community, and that genuinely inspired me cuz ive always wanted to contribute to open source. I've benefited from free, open-source software my entire life, and I finally wanted to step up and give something back.
 
-I am still actively learning Rust. While I think the core idea of sandspy has massive potential, I simply lack the advanced systems knowledge (and the AI resources) to scale it to its absolute limits entirely on my own right now. I know I sound naive (i am) but I'm trying my best to learn and improve.
+I am still actively learning Rust. While I think the core idea of sandspy has massive potential, I'm yet to gain the advanced systems knowledge to scale it to its absolute limits entirely on my own right now. I know I sound naive (i am) but I'm trying my best to learn and improve.
 
 If you find this concept cool, **please leave a star ⭐**, open an issue, or even submit a Pull Request! I would love for experienced developers to interact with this, improve the codebase, and help me learn in the process. I promise to keep working hard to build free, useful stuff for everyone.
 
