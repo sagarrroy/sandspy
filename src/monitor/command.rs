@@ -1,10 +1,9 @@
 // sandspy::monitor::command — Shell command interception
 
-use crate::events::{Event, EventKind, RiskLevel};
+use crate::events::{join_cmdline, Event, EventKind, RiskLevel};
 use crate::monitor::process::PidSet;
 use anyhow::Result;
 use std::collections::HashSet;
-use std::ffi::OsString;
 use std::path::PathBuf;
 use std::time::Duration;
 use sysinfo::{ProcessesToUpdate, System};
@@ -68,14 +67,6 @@ pub async fn run(tx: mpsc::Sender<Event>, pids: PidSet) -> Result<()> {
 
         time::sleep(Duration::from_millis(250)).await;
     }
-}
-
-fn join_cmdline(cmdline: &[OsString]) -> String {
-    cmdline
-        .iter()
-        .map(|arg| arg.to_string_lossy().to_string())
-        .collect::<Vec<_>>()
-        .join(" ")
 }
 
 /// Returns true for Electron/Chromium internal subprocess launches that

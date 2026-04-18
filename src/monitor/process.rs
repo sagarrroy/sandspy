@@ -1,10 +1,9 @@
 // sandspy::monitor::process — Process tree monitoring
 
-use crate::events::{AgentInfo, Event, EventKind};
+use crate::events::{join_cmdline, AgentInfo, Event, EventKind};
 use crate::platform;
 use anyhow::{Context, Result};
 use std::collections::{HashMap, HashSet};
-use std::ffi::OsString;
 use std::process::{Command, Stdio};
 use std::sync::Arc;
 use std::time::Duration;
@@ -293,14 +292,6 @@ fn collect_process_tree(
     }
 
     tree
-}
-
-fn join_cmdline(cmdline: &[OsString]) -> String {
-    cmdline
-        .iter()
-        .map(|arg| arg.to_string_lossy().to_string())
-        .collect::<Vec<_>>()
-        .join(" ")
 }
 
 fn known_agent_names() -> HashSet<&'static str> {

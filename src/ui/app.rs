@@ -1,8 +1,4 @@
-// sandspy::ui::app — TUI application state (Step 3.1)
-//
-// Central state object passed into every Ratatui render call.
-// Updated from the monitor event bus via Arc<Mutex<App>>.
-
+// sandspy::ui::app — TUI application state
 #![allow(dead_code)]
 
 use crate::events::{AgentInfo, Event, EventKind, NetCategory, RiskLevel};

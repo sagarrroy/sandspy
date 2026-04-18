@@ -16,7 +16,7 @@ Thumbs.db
 # Environment
 .env
 .env.*
-
+CLAUDE.md
 
 # Planning documents — kept local only, not for public repo
 technical_implementation.md

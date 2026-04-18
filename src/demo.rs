@@ -1,9 +1,3 @@
-// sandspy::demo — Randomized demo mode (Step 2.4)
-//
-// Generates a realistic 25-second simulated session and routes it through
-// the same ui::live renderer as real watch mode.
-// Supports --seed for reproducible demos, --scan for instant summary.
-
 use crate::events::{create_event_bus, Event, EventKind, FileCategory, NetCategory, RiskLevel};
 use crate::ui;
 use anyhow::{Context, Result};
@@ -75,16 +69,13 @@ static ENV_VARS: &[(&str, bool)] = &[
     ("HOME", false),
 ];
 
-// ─── Demo weights (higher = more likely) ────────────────────────────────────
-//
-// We want mostly safe-looking activity with occasional spicy events.
-// EventType index: 0=FileRead 1=FileWrite 2=Network 3=Command 4=EnvVar
+// ─── Demo weights ────────────────────────────────────────────────────────────
 
 static WEIGHTS: &[u32] = &[35, 20, 25, 15, 5];
 
 // ─── Public entry point ──────────────────────────────────────────────────────
 
-pub async fn run(scan: bool, seed: Option<u64>, _dashboard: bool) -> Result<()> {
+pub async fn run(scan: bool, seed: Option<u64>, dashboard: bool) -> Result<()> {
     let mut rng: Box<dyn RngCore> = if let Some(s) = seed {
         Box::new(StdRng::seed_from_u64(s))
     } else {
@@ -95,6 +86,8 @@ pub async fn run(scan: bool, seed: Option<u64>, _dashboard: bool) -> Result<()> 
 
     if scan {
         run_scan_summary(events).await
+    } else if dashboard {
+        run_dashboard_mode(events).await
     } else {
         run_live_stream(events, seed).await
     }
@@ -121,7 +114,6 @@ async fn run_live_stream(events: Vec<(Duration, Event)>, seed: Option<u64>) -> R
 
     let (tx, mut rx) = create_event_bus();
 
-    // Feed events on a timer in a background task
     let feeder = tokio::spawn(async move {
         let mut elapsed = Duration::ZERO;
         for (at, event) in events {
@@ -133,7 +125,6 @@ async fn run_live_stream(events: Vec<(Duration, Event)>, seed: Option<u64>) -> R
                 break;
             }
         }
-        // drop tx → live renderer loop ends
     });
 
     let _stats = ui::live::run(&mut rx, "demo-agent (simulated)", 1).await;
@@ -142,7 +133,40 @@ async fn run_live_stream(events: Vec<(Duration, Event)>, seed: Option<u64>) -> R
     Ok(())
 }
 
-// ─── Scan summary mode (--scan flag) ─────────────────────────────────────────
+// ─── Dashboard mode ─────────────────────────────────────────────────────────
+
+async fn run_dashboard_mode(events: Vec<(Duration, Event)>) -> Result<()> {
+    let (tx, rx) = create_event_bus();
+
+    let feeder = tokio::spawn(async move {
+        let mut elapsed = Duration::ZERO;
+        for (at, event) in events {
+            if at > elapsed {
+                time::sleep(at - elapsed).await;
+                elapsed = at;
+            }
+            if tx.send(event).await.is_err() {
+                break;
+            }
+        }
+    });
+
+    let stats = ui::run_dashboard(rx, "demo-agent (simulated)".to_string(), None, false).await?;
+    let _ = feeder.await;
+
+    let data = ui::summary::SessionData {
+        agent_name: "demo-agent".to_string(),
+        agent_pid: None,
+        start: Utc::now() - chrono::Duration::seconds(25),
+        end: Utc::now(),
+        events: stats.events,
+        risk_score: stats.risk_score,
+    };
+    ui::summary::print_summary(&data);
+    Ok(())
+}
+
+// ─── Scan summary mode ─────────────────────────────────────────────────────
 
 async fn run_scan_summary(events: Vec<(Duration, Event)>) -> Result<()> {
     let raw_events: Vec<Event> = events.into_iter().map(|(_, e)| e).collect();
@@ -150,7 +174,7 @@ async fn run_scan_summary(events: Vec<(Duration, Event)>) -> Result<()> {
 
     let data = ui::summary::SessionData {
         agent_name: "demo-agent".to_string(),
-        agent_pid: Some(99999),
+        agent_pid: None,
         start: Utc::now() - chrono::Duration::seconds(25),
         end: Utc::now(),
         events: raw_events,
@@ -168,7 +192,6 @@ fn generate_session(rng: &mut dyn RngCore) -> Result<Vec<(Duration, Event)>> {
         WeightedIndex::new(WEIGHTS).context("failed to initialize demo event distribution")?;
     let mut events: Vec<(Duration, Event)> = Vec::new();
 
-    // Scatter ~40 events across 25 seconds with weighted timing
     for _ in 0..40 {
         let offset_ms = rng.gen_range(500u64..24_500);
         let at = Duration::from_millis(offset_ms);

@@ -17,15 +17,17 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 
-const MAX_SCAN_BYTES: u64 = 512 * 1024; // 512KB — scan larger files than before
-const DEBOUNCE_MS: u64 = 300;
-
-pub async fn run(tx: mpsc::Sender<Event>, pids: PidSet) -> Result<()> {
+pub async fn run(
+    tx: mpsc::Sender<Event>,
+    pids: PidSet,
+    max_scan_bytes: u64,
+    debounce_ms: u64,
+) -> Result<()> {
     let watch_dir = resolve_watch_dir(&pids).await;
-    let mut snapshots = preload_sensitive_snapshots(&watch_dir);
+    let mut snapshots = preload_sensitive_snapshots(&watch_dir, max_scan_bytes);
 
     // Scan pre-existing sensitive files at startup and emit findings immediately
-    startup_secret_scan(&watch_dir, &tx).await?;
+    startup_secret_scan(&watch_dir, &tx, max_scan_bytes).await?;
 
     let (notify_tx, mut notify_rx) = tokio::sync::mpsc::unbounded_channel();
     let mut watcher = notify::recommended_watcher(move |event| {
@@ -50,7 +52,7 @@ pub async fn run(tx: mpsc::Sender<Event>, pids: PidSet) -> Result<()> {
     tracing::debug!(dir = %watch_dir.display(), "filesystem monitor watching");
 
     let mut last_emit: HashMap<PathBuf, Instant> = HashMap::new();
-    let debounce = Duration::from_millis(DEBOUNCE_MS);
+    let debounce = Duration::from_millis(debounce_ms);
 
     while let Some(event_result) = notify_rx.recv().await {
         let event = match event_result {
@@ -79,7 +81,7 @@ pub async fn run(tx: mpsc::Sender<Event>, pids: PidSet) -> Result<()> {
 
         let mut filtered = event.clone();
         filtered.paths = paths_to_process;
-        handle_notify_event(&filtered, &tx, &mut snapshots).await?;
+        handle_notify_event(&filtered, &tx, &mut snapshots, max_scan_bytes).await?;
     }
 
     Ok(())
@@ -87,7 +89,7 @@ pub async fn run(tx: mpsc::Sender<Event>, pids: PidSet) -> Result<()> {
 
 /// Scan sensitive files that already exist at monitoring start.
 /// This catches secrets that were written before sandspy was launched.
-async fn startup_secret_scan(root: &Path, tx: &mpsc::Sender<Event>) -> Result<()> {
+async fn startup_secret_scan(root: &Path, tx: &mpsc::Sender<Event>, max_scan: u64) -> Result<()> {
     let mut paths = Vec::new();
     let _ = visit_tree(root, &mut |p| {
         if !is_noise_path(p) && is_sensitive_path(p) {
@@ -114,7 +116,7 @@ async fn startup_secret_scan(root: &Path, tx: &mpsc::Sender<Event>) -> Result<()
     }
 
     for path in paths {
-        emit_secret_access_events_with_source(&path, tx, SecretSource::File).await?;
+        emit_secret_access_events_with_source(&path, tx, SecretSource::File, max_scan).await?;
     }
 
     Ok(())
@@ -124,6 +126,7 @@ async fn handle_notify_event(
     event: &NotifyEvent,
     tx: &mpsc::Sender<Event>,
     snapshots: &mut HashMap<PathBuf, String>,
+    max_scan: u64,
 ) -> Result<()> {
     for path in &event.paths {
         if is_noise_path(path) {
@@ -132,7 +135,7 @@ async fn handle_notify_event(
 
         match &event.kind {
             NotifyEventKind::Create(_) => {
-                let diff_summary = build_write_summary(path, snapshots, true);
+                let diff_summary = build_write_summary(path, snapshots, true, max_scan);
                 let sensitive = is_sensitive_path(path);
                 let risk = if sensitive { 15 } else { 0 };
                 let file_event = Event::with_risk(
@@ -150,11 +153,12 @@ async fn handle_notify_event(
                 // Only scan content for secrets on sensitive file types
                 // (avoids false positives from docs/code containing example keys)
                 if sensitive {
-                    emit_secret_access_events_with_source(path, tx, SecretSource::File).await?;
+                    emit_secret_access_events_with_source(path, tx, SecretSource::File, max_scan)
+                        .await?;
                 }
             }
             NotifyEventKind::Modify(_) => {
-                let diff_summary = build_write_summary(path, snapshots, false);
+                let diff_summary = build_write_summary(path, snapshots, false, max_scan);
                 let sensitive = is_sensitive_path(path);
                 let risk = if sensitive { 10 } else { 0 };
                 let file_event = Event::with_risk(
@@ -171,7 +175,8 @@ async fn handle_notify_event(
 
                 // Scan content on every modify for sensitive files
                 if sensitive {
-                    emit_secret_access_events_with_source(path, tx, SecretSource::File).await?;
+                    emit_secret_access_events_with_source(path, tx, SecretSource::File, max_scan)
+                        .await?;
                 }
             }
             NotifyEventKind::Remove(_) => {
@@ -197,6 +202,7 @@ async fn emit_secret_access_events_with_source(
     path: &Path,
     tx: &mpsc::Sender<Event>,
     source: SecretSource,
+    max_scan: u64,
 ) -> Result<()> {
     // For known sensitive filenames — even without content match — emit a warning
     let fname = path
@@ -206,7 +212,7 @@ async fn emit_secret_access_events_with_source(
     if secrets::is_sensitive_filename(fname) {
         // We know this file is sensitive regardless of content
         // Only emit if we can't scan it (binary, too large, etc.)
-        if read_text_file_if_small(path).is_none() {
+        if read_text_file_if_small(path, max_scan).is_none() {
             let event = Event::with_risk(
                 EventKind::SecretAccess {
                     name: format!("sensitive file: {fname}"),
@@ -221,7 +227,7 @@ async fn emit_secret_access_events_with_source(
         }
     }
 
-    let Some(contents) = read_text_file_if_small(path) else {
+    let Some(contents) = read_text_file_if_small(path, max_scan) else {
         return Ok(());
     };
 
@@ -261,15 +267,16 @@ fn build_write_summary(
     path: &Path,
     snapshots: &mut HashMap<PathBuf, String>,
     created: bool,
+    max_scan: u64,
 ) -> Option<String> {
     if created {
-        if let Some(contents) = read_text_file_if_small(path) {
+        if let Some(contents) = read_text_file_if_small(path, max_scan) {
             snapshots.insert(path.to_path_buf(), contents);
         }
         return Some("new file".to_string());
     }
 
-    let current = read_text_file_if_small(path)?;
+    let current = read_text_file_if_small(path, max_scan)?;
     let previous = snapshots.insert(path.to_path_buf(), current.clone());
 
     let previous = previous?;
@@ -291,9 +298,9 @@ fn build_write_summary(
     }
 }
 
-fn read_text_file_if_small(path: &Path) -> Option<String> {
+fn read_text_file_if_small(path: &Path, max_scan: u64) -> Option<String> {
     let metadata = fs::metadata(path).ok()?;
-    if !metadata.is_file() || metadata.len() > MAX_SCAN_BYTES {
+    if !metadata.is_file() || metadata.len() > max_scan {
         return None;
     }
     fs::read_to_string(path).ok()
@@ -323,13 +330,13 @@ async fn resolve_watch_dir(pids: &PidSet) -> PathBuf {
     std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
 }
 
-fn preload_sensitive_snapshots(root: &Path) -> HashMap<PathBuf, String> {
+fn preload_sensitive_snapshots(root: &Path, max_scan_bytes: u64) -> HashMap<PathBuf, String> {
     let mut snapshots = HashMap::new();
     let _ = visit_tree(root, &mut |path| {
         if is_noise_path(path) || !is_sensitive_path(path) {
             return;
         }
-        if let Some(contents) = read_text_file_if_small(path) {
+        if let Some(contents) = read_text_file_if_small(path, max_scan_bytes) {
             snapshots.insert(path.to_path_buf(), contents);
         }
     });

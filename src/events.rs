@@ -144,6 +144,15 @@ pub fn create_event_bus() -> (mpsc::Sender<Event>, mpsc::Receiver<Event>) {
     mpsc::channel(10_000)
 }
 
+/// Join a command line from OsString parts. Used across monitor modules.
+pub fn join_cmdline(cmdline: &[std::ffi::OsString]) -> String {
+    cmdline
+        .iter()
+        .map(|arg| arg.to_string_lossy().to_string())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 /// Info about a detected AI agent process.
 #[derive(Debug, Clone)]
 pub struct AgentInfo {

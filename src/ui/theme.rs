@@ -1,6 +1,4 @@
 // sandspy::ui::theme — Single source of truth for all TUI colors
-//
-// All widgets reference these helpers. Change a color here, it changes everywhere.
 #![allow(dead_code)]
 
 use ratatui::style::{Color, Modifier, Style};

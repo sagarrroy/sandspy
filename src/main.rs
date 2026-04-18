@@ -51,6 +51,18 @@ struct Cli {
     /// Output events as JSON lines
     #[arg(long, global = true)]
     json: bool,
+
+    /// Override poll interval (ms). Default from config.toml or 250.
+    #[arg(long, global = true)]
+    poll_interval: Option<u64>,
+
+    /// Override maximum events in ring buffer.
+    #[arg(long, global = true)]
+    max_events: Option<usize>,
+
+    /// Exclude paths matching this pattern (can be repeated).
+    #[arg(long, global = true, action = clap::ArgAction::Append)]
+    exclude_path: Vec<String>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -142,6 +154,10 @@ struct GlobalOptions {
     profile: Option<String>,
     no_color: bool,
     json: bool,
+    poll_interval: Option<u64>,
+    max_events: Option<usize>,
+    #[allow(dead_code)]
+    exclude_paths: Vec<String>,
 }
 
 #[tokio::main]
@@ -171,7 +187,21 @@ async fn main() -> Result<()> {
         profile: cli.profile,
         no_color: cli.no_color,
         json: cli.json,
+        poll_interval: cli.poll_interval,
+        max_events: cli.max_events,
+        exclude_paths: cli.exclude_path,
     };
+
+    // Load config and apply CLI overrides
+    let mut cfg = config::load_config();
+    if let Some(pi) = global.poll_interval {
+        cfg.monitoring.poll_interval_ms = pi.clamp(50, 10_000);
+        cfg.monitoring.net_poll_interval_ms = pi.clamp(50, 10_000);
+    }
+    if let Some(me) = global.max_events {
+        cfg.monitoring.max_events = me.min(200_000);
+    }
+    let config = std::sync::Arc::new(cfg);
 
     // Respect NO_COLOR env var and --no-color flag
     if global.no_color || std::env::var("NO_COLOR").is_ok() {
@@ -180,7 +210,7 @@ async fn main() -> Result<()> {
 
     match cli.command {
         None => handle_interactive().await?,
-        Some(command) => handle_command(command, global).await?,
+        Some(command) => handle_command(command, global, config.clone()).await?,
     }
 
     Ok(())
@@ -190,10 +220,14 @@ async fn handle_interactive() -> Result<()> {
     interactive::run().await
 }
 
-async fn handle_command(command: Commands, global: GlobalOptions) -> Result<()> {
+async fn handle_command(
+    command: Commands,
+    global: GlobalOptions,
+    config: std::sync::Arc<config::Config>,
+) -> Result<()> {
     match command {
-        Commands::Watch { command } => handle_watch(command, global).await,
-        Commands::Attach { pid, name } => handle_attach(pid, name, global).await,
+        Commands::Watch { command } => handle_watch(command, global, config.clone()).await,
+        Commands::Attach { pid, name } => handle_attach(pid, name, global, config.clone()).await,
         Commands::Demo { scan, seed } => handle_demo(scan, seed, global).await,
         Commands::Report { session, format } => handle_report(session, format, global).await,
         Commands::History { session } => handle_history(session, global).await,
@@ -202,7 +236,11 @@ async fn handle_command(command: Commands, global: GlobalOptions) -> Result<()> 
     }
 }
 
-async fn handle_watch(command: Option<String>, global: GlobalOptions) -> Result<()> {
+async fn handle_watch(
+    command: Option<String>,
+    global: GlobalOptions,
+    config: std::sync::Arc<config::Config>,
+) -> Result<()> {
     let watch_command = match command.clone() {
         Some(cmd) => cmd,
         None => {
@@ -314,7 +352,13 @@ async fn handle_watch(command: Option<String>, global: GlobalOptions) -> Result<
         Ok::<(), anyhow::Error>(())
     });
     let filesystem_handle = tokio::spawn(async move {
-        monitor::filesystem::run(tx_for_filesystem, pids_for_filesystem).await
+        monitor::filesystem::run(
+            tx_for_filesystem,
+            pids_for_filesystem,
+            config.monitoring.max_scan_bytes,
+            config.monitoring.debounce_ms,
+        )
+        .await
     });
     let network_handle =
         tokio::spawn(async move { monitor::network::run(tx_for_network, pids_for_network).await });
@@ -425,6 +469,7 @@ async fn handle_attach(
     pid: Option<u32>,
     name: Option<String>,
     global: GlobalOptions,
+    config: std::sync::Arc<config::Config>,
 ) -> Result<()> {
     tracing::info!(
         pid = ?pid,
@@ -456,16 +501,125 @@ async fn handle_attach(
 
     let (tx, mut rx) = events::create_event_bus();
     let pids = monitor::process::create_pid_set();
-    let monitor_handle = tokio::spawn(monitor::process::attach_and_monitor(
-        target_pid,
-        tx.clone(),
-        pids,
-    ));
-    let process_state = Arc::new(RwLock::new(WatchProcessState::default()));
-    drop(tx);
 
-    print_watch_events(&mut rx, None, process_state).await;
-    monitor_handle.await??;
+    // Auto-match profile based on process name
+    let loaded_profiles = analysis::profiler::load_profiles()?;
+    let process_name = {
+        let mut sys = sysinfo::System::new_all();
+        sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+        sys.process(sysinfo::Pid::from_u32(target_pid))
+            .map(|p| p.name().to_string_lossy().to_string())
+            .unwrap_or_default()
+    };
+    let matched_profile = analysis::profiler::match_profile(
+        &loaded_profiles,
+        global.profile.as_deref(),
+        Some(&process_name),
+    );
+    tracing::info!(profile = ?matched_profile.map(|p| p.id.clone()), "attach mode using profile");
+
+    // Seed the PID set
+    monitor::process::seed_pid_set(&pids, &[target_pid]).await;
+
+    let tx_for_process = tx.clone();
+    let pids_for_process = pids.clone();
+    let process_handle = tokio::spawn(async move {
+        monitor::process::attach_and_monitor(target_pid, tx_for_process, pids_for_process).await
+    });
+
+    let tx_for_filesystem = tx.clone();
+    let pids_for_filesystem = pids.clone();
+    let filesystem_handle = tokio::spawn(async move {
+        monitor::filesystem::run(
+            tx_for_filesystem,
+            pids_for_filesystem,
+            config.monitoring.max_scan_bytes,
+            config.monitoring.debounce_ms,
+        )
+        .await
+    });
+
+    let tx_for_network = tx.clone();
+    let pids_for_network = pids.clone();
+    let network_handle =
+        tokio::spawn(async move { monitor::network::run(tx_for_network, pids_for_network).await });
+
+    let tx_for_command = tx.clone();
+    let pids_for_command = pids.clone();
+    let command_handle =
+        tokio::spawn(async move { monitor::command::run(tx_for_command, pids_for_command).await });
+
+    let tx_for_environment = tx.clone();
+    let pids_for_environment = pids.clone();
+    let environment_handle = tokio::spawn(async move {
+        monitor::environment::run(tx_for_environment, pids_for_environment).await
+    });
+
+    let tx_for_clipboard = tx.clone();
+    let clipboard_handle =
+        tokio::spawn(async move { monitor::clipboard::run(tx_for_clipboard).await });
+
+    let agent_label = process_name.clone();
+    let verbosity_level: u8 = match global.verbosity {
+        Verbosity::Low => 0,
+        Verbosity::Medium => 1,
+        Verbosity::High => 2,
+        Verbosity::All => 3,
+    };
+
+    let live_stats = if global.dashboard {
+        let stats = ui::run_dashboard(
+            rx,
+            agent_label.clone(),
+            Some(target_pid),
+            global.no_color || std::env::var("NO_COLOR").is_ok(),
+        )
+        .await?;
+        process_handle.abort();
+        filesystem_handle.abort();
+        network_handle.abort();
+        command_handle.abort();
+        environment_handle.abort();
+        clipboard_handle.abort();
+        drop(tx);
+        stats
+    } else {
+        let tx_for_mem = tx.clone();
+        let agent_for_printer = agent_label.clone();
+        let printer_handle = tokio::spawn(async move {
+            ui::live::run(&mut rx, &agent_for_printer, verbosity_level).await
+        });
+        process_handle.await??;
+        filesystem_handle.abort();
+        let _ = filesystem_handle.await;
+        network_handle.abort();
+        let _ = network_handle.await;
+        command_handle.abort();
+        let _ = command_handle.await;
+        environment_handle.abort();
+        let _ = environment_handle.await;
+        clipboard_handle.abort();
+        let _ = clipboard_handle.await;
+        monitor::memory::run(tx_for_mem, std::time::SystemTime::now(), &HashSet::new()).await?;
+        drop(tx);
+        printer_handle.await?
+    };
+
+    let session_start = chrono::Utc::now();
+    let duration_secs = chrono::Utc::now()
+        .signed_duration_since(session_start)
+        .num_seconds()
+        .max(0) as u64;
+    let metadata = history::SessionMetadata {
+        agent_name: agent_label,
+        pid: Some(target_pid),
+        duration: duration_secs,
+        risk_score: live_stats.risk_score,
+        event_count: live_stats.event_count,
+        timestamp: session_start,
+    };
+    let session_id = history::persist_session(&metadata, &live_stats.events)?;
+    println!("  session saved: {}", session_id);
 
     Ok(())
 }
@@ -567,11 +721,13 @@ async fn handle_profiles(action: ProfileAction, _global: GlobalOptions) -> Resul
 }
 
 #[derive(Debug, Default)]
+#[allow(dead_code)]
 struct WatchProcessState {
     seen: HashSet<u32>,
     active: HashSet<u32>,
 }
 
+#[allow(dead_code)]
 async fn print_watch_events(
     rx: &mut mpsc::Receiver<events::Event>,
     tx: Option<&mpsc::Sender<events::Event>>,

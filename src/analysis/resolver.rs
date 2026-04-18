@@ -11,6 +11,7 @@ const DNS_CACHE_TTL: Duration = Duration::from_secs(5 * 60);
 pub enum IpCategory {
     Private,
     Aws,
+    Azure,
     Cloudflare,
     Google,
     Loopback,
@@ -172,16 +173,16 @@ fn categorize_v4(ip: Ipv4Addr) -> IpCategory {
     // === Microsoft Azure ===
     // 20.0.0.0/8 — Azure public IPs (massive range)
     if in_cidr(ip, Ipv4Addr::new(20, 0, 0, 0), 8) {
-        return IpCategory::Aws; // re-use Aws = "Big Tech Cloud" for now
+        return IpCategory::Azure;
     }
     // 40.64.0.0/10 — Azure
     if in_cidr(ip, Ipv4Addr::new(40, 64, 0, 0), 10) {
-        return IpCategory::Aws;
+        return IpCategory::Azure;
     }
     // 13.64.0.0/11, 13.104.0.0/14 — Azure Global
     if in_cidr(ip, Ipv4Addr::new(13, 64, 0, 0), 11) || in_cidr(ip, Ipv4Addr::new(13, 104, 0, 0), 14)
     {
-        return IpCategory::Aws;
+        return IpCategory::Azure;
     }
 
     // === Documentation / RFC5737

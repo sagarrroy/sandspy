@@ -26,7 +26,18 @@ struct SignatureDb {
 }
 
 pub async fn run(tx: mpsc::Sender<Event>, pids: PidSet) -> Result<()> {
-    let signatures = load_signatures().unwrap_or_default();
+    let signatures = match load_signatures() {
+        Ok(db) => {
+            tracing::debug!("network signatures loaded");
+            db
+        }
+        Err(e) => {
+            tracing::warn!(
+                "failed to load network signatures — all connections will be categorized as Unknown: {e}"
+            );
+            SignatureDb::default()
+        }
+    };
     let mut seen_connections = HashSet::new();
 
     loop {
@@ -217,6 +228,7 @@ fn categorize_target(
     match ip_category {
         IpCategory::Google => NetCategory::ExpectedApi,
         IpCategory::Aws => NetCategory::ExpectedApi,
+        IpCategory::Azure => NetCategory::ExpectedApi,
         IpCategory::Cloudflare => NetCategory::ExpectedApi,
         IpCategory::Private
         | IpCategory::Loopback

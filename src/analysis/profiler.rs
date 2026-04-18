@@ -1,5 +1,4 @@
 // sandspy::analysis::profiler — Agent profile loading and matching
-
 #![allow(dead_code)]
 
 use anyhow::{Context, Result};
@@ -218,9 +217,4 @@ fn sandspy_profiles_dir() -> PathBuf {
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("."));
     home.join(".sandspy").join("profiles")
-}
-
-#[allow(dead_code)]
-fn _profile_path(root: &Path, id: &str) -> PathBuf {
-    root.join(format!("{id}.toml"))
 }

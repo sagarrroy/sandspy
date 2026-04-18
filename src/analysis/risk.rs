@@ -1,4 +1,5 @@
 // sandspy::analysis::risk — Risk scoring engine
+#![allow(dead_code)]
 
 use crate::events::{Event, EventKind, NetCategory, RiskLevel};
 use std::path::Path;

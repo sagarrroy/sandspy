@@ -193,7 +193,7 @@ fn build_patterns() -> Vec<CompiledPattern> {
         ),
         (
             "Slack Webhook",
-            r"https://hooks\.slack\.com/services/T[A-Z0-9]+/B[A-Z0-9]+/[a-zA-Z0-9]+",
+            r"https://hooks\.slack\.com/services/T[A-Z0-9]{8,12}/B[A-Z0-9]{8,12}/[a-zA-Z0-9]{22,34}",
         ),
         // === Auth Tokens ===
         (
@@ -212,10 +212,13 @@ fn build_patterns() -> Vec<CompiledPattern> {
             r"(?i)(postgres(ql)?|mysql|mongodb(\+srv)?|redis|amqp|mssql|sqlserver)://[^\s]{10,}",
         ),
         // === Generic credential patterns ===
-        ("Password in URL", r"://.{1,64}:.{8,}@[^\s]+"),
+        (
+            "Password in URL",
+            r"://[^:\s]{1,64}:[^@\s]{8,128}@[^:\s]{1,253}",
+        ),
         (
             "Generic API Key",
-            r"(?i)(?:api[_\-]?key|apikey|api[_\-]?secret|access[_\-]?key)\s*[=:]\s*[A-Za-z0-9_\-\.]{16,}",
+            r"(?i)(?:api[_\-]?key|apikey|api[_\-]?secret|access[_\-]?key)\s*[=:]\s*[A-Za-z0-9_\-\.]{16,64}",
         ),
         (
             "Env File Secret",
