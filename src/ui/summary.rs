@@ -7,6 +7,7 @@ use crate::events::{Event, EventKind, NetCategory, RiskLevel};
 use crate::ui::live::SessionStats;
 use chrono::{DateTime, Utc};
 use colored::*;
+use std::cmp::Reverse;
 
 /// A notable finding to display in the findings section.
 pub struct Finding {
@@ -252,7 +253,7 @@ fn extract_findings(events: &[Event]) -> Vec<Finding> {
     }
 
     // Sort: Critical first, then High, Medium, Low
-    findings.sort_by(|a, b| b.severity.cmp(&a.severity));
+    findings.sort_by_key(|x| Reverse(x.severity));
 
     // Cap at 10 to keep output readable
     findings.truncate(10);

@@ -61,53 +61,52 @@ impl RiskScorer {
             EventKind::NetworkConnection {
                 remote_addr,
                 remote_port,
-                category,
+                category: NetCategory::Unknown,
                 bytes_sent,
                 ..
             } => {
-                if *category == NetCategory::Unknown {
+                alerts.push(Event::new(EventKind::Alert {
+                    message: format!(
+                        "unknown network connection detected: {}:{}",
+                        remote_addr, remote_port
+                    ),
+                    severity: RiskLevel::High,
+                }));
+
+                self.unknown_data_sent = self.unknown_data_sent.saturating_add(*bytes_sent);
+                if !self.unknown_data_alerted
+                    && self.unknown_data_sent >= UNKNOWN_DATA_ALERT_THRESHOLD_BYTES
+                {
+                    self.unknown_data_alerted = true;
                     alerts.push(Event::new(EventKind::Alert {
                         message: format!(
-                            "unknown network connection detected: {}:{}",
-                            remote_addr, remote_port
+                            "unknown network data threshold exceeded: {} bytes",
+                            self.unknown_data_sent
                         ),
-                        severity: RiskLevel::High,
-                    }));
-
-                    self.unknown_data_sent = self.unknown_data_sent.saturating_add(*bytes_sent);
-                    if !self.unknown_data_alerted
-                        && self.unknown_data_sent >= UNKNOWN_DATA_ALERT_THRESHOLD_BYTES
-                    {
-                        self.unknown_data_alerted = true;
-                        alerts.push(Event::new(EventKind::Alert {
-                            message: format!(
-                                "unknown network data threshold exceeded: {} bytes",
-                                self.unknown_data_sent
-                            ),
-                            severity: RiskLevel::Critical,
-                        }));
-                    }
-                }
-            }
-            EventKind::ShellCommand { command, risk, .. } => {
-                if *risk == RiskLevel::Critical {
-                    alerts.push(Event::new(EventKind::Alert {
-                        message: format!("critical shell command executed: {command}"),
                         severity: RiskLevel::Critical,
                     }));
                 }
+            }
+            EventKind::ShellCommand {
+                command,
+                risk: RiskLevel::Critical,
+                ..
+            } => {
+                alerts.push(Event::new(EventKind::Alert {
+                    message: format!("critical shell command executed: {command}"),
+                    severity: RiskLevel::Critical,
+                }));
             }
             EventKind::FileRead {
-                path, sensitive, ..
-            } => {
-                if *sensitive && is_ssh_or_pem(path) {
-                    alerts.push(Event::new(EventKind::Alert {
-                        message: format!("sensitive key file read: {}", path.display()),
-                        severity: RiskLevel::Critical,
-                    }));
-                }
+                path,
+                sensitive: true,
+                ..
+            } if is_ssh_or_pem(path) => {
+                alerts.push(Event::new(EventKind::Alert {
+                    message: format!("sensitive key file read: {}", path.display()),
+                    severity: RiskLevel::Critical,
+                }));
             }
-            EventKind::Alert { .. } => {}
             _ => {}
         }
 

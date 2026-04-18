@@ -5,6 +5,7 @@ use crate::ui::summary::{self, Finding, SessionData};
 use anyhow::{Context, Result};
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use serde::{Deserialize, Serialize};
+use std::cmp::Reverse;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
@@ -190,7 +191,7 @@ pub fn extract_findings(events: &[Event]) -> Vec<Finding> {
         }
     }
 
-    findings.sort_by(|left, right| right.severity.cmp(&left.severity));
+    findings.sort_by_key(|x| Reverse(x.severity));
     findings.truncate(10);
     findings
 }
