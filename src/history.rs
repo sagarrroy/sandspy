@@ -5,6 +5,7 @@ use crate::ui::summary;
 use anyhow::{Context, Result};
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use serde::{Deserialize, Serialize};
+use std::cmp::Reverse;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
@@ -51,7 +52,7 @@ pub fn persist_session(metadata: &SessionMetadata, events: &[Event]) -> Result<S
 
 pub async fn list() -> Result<()> {
     let mut sessions = load_all_sessions()?;
-    sessions.sort_by(|left, right| right.1.timestamp.cmp(&left.1.timestamp));
+    sessions.sort_by_key(|x| Reverse(x.1.timestamp));
 
     if sessions.is_empty() {
         println!("No sessions found in {}", sessions_root().display());
