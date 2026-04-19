@@ -126,9 +126,7 @@ fn sessions_root() -> PathBuf {
 
 fn apply_filter(sessions: &mut Vec<(String, SessionMetadata)>, filter: &ListFilter) {
     if let Some(ref agent) = filter.agent {
-        sessions.retain(|(_, m)| {
-            m.agent_name.to_lowercase().contains(&agent.to_lowercase())
-        });
+        sessions.retain(|(_, m)| m.agent_name.to_lowercase().contains(&agent.to_lowercase()));
     }
     if let Some(since) = filter.since {
         sessions.retain(|(_, m)| m.timestamp >= since);
@@ -215,7 +213,11 @@ fn read_events_jsonl(path: &Path) -> Result<Vec<Event>> {
         let line = match line {
             Ok(value) => value,
             Err(e) => {
-                warn!("failed to read line in events file {}: {}", path.display(), e);
+                warn!(
+                    "failed to read line in events file {}: {}",
+                    path.display(),
+                    e
+                );
                 continue;
             }
         };
@@ -276,24 +278,69 @@ mod tests {
         let ts3 = chrono::Utc.with_ymd_and_hms(2026, 3, 1, 0, 0, 0).unwrap();
 
         let all = vec![
-            ("s1".to_string(), SessionMetadata { agent_name: "cursor".into(), pid: None, timestamp: ts1, duration: 0, event_count: 0, risk_score: 30 }),
-            ("s2".to_string(), SessionMetadata { agent_name: "windsurf".into(), pid: None, timestamp: ts2, duration: 0, event_count: 0, risk_score: 70 }),
-            ("s3".to_string(), SessionMetadata { agent_name: "cursor".into(), pid: None, timestamp: ts3, duration: 0, event_count: 0, risk_score: 10 }),
+            (
+                "s1".to_string(),
+                SessionMetadata {
+                    agent_name: "cursor".into(),
+                    pid: None,
+                    timestamp: ts1,
+                    duration: 0,
+                    event_count: 0,
+                    risk_score: 30,
+                },
+            ),
+            (
+                "s2".to_string(),
+                SessionMetadata {
+                    agent_name: "windsurf".into(),
+                    pid: None,
+                    timestamp: ts2,
+                    duration: 0,
+                    event_count: 0,
+                    risk_score: 70,
+                },
+            ),
+            (
+                "s3".to_string(),
+                SessionMetadata {
+                    agent_name: "cursor".into(),
+                    pid: None,
+                    timestamp: ts3,
+                    duration: 0,
+                    event_count: 0,
+                    risk_score: 10,
+                },
+            ),
         ];
 
         let mut sessions = all.clone();
-        let f = ListFilter { agent: Some("cursor".into()), since: None, until: None, min_risk: None };
+        let f = ListFilter {
+            agent: Some("cursor".into()),
+            since: None,
+            until: None,
+            min_risk: None,
+        };
         apply_filter(&mut sessions, &f);
         assert_eq!(sessions.len(), 2);
 
         let mut sessions = all.clone();
-        let f = ListFilter { agent: None, since: None, until: None, min_risk: Some(50) };
+        let f = ListFilter {
+            agent: None,
+            since: None,
+            until: None,
+            min_risk: Some(50),
+        };
         apply_filter(&mut sessions, &f);
         assert_eq!(sessions.len(), 1);
         assert_eq!(sessions[0].0, "s2");
 
         let mut sessions = all.clone();
-        let f = ListFilter { agent: None, since: Some(ts2), until: None, min_risk: None };
+        let f = ListFilter {
+            agent: None,
+            since: Some(ts2),
+            until: None,
+            min_risk: None,
+        };
         apply_filter(&mut sessions, &f);
         assert_eq!(sessions.len(), 2);
     }

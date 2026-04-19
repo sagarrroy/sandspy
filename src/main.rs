@@ -246,7 +246,14 @@ async fn handle_command(
         Commands::Attach { pid, name } => handle_attach(pid, name, global, config.clone()).await,
         Commands::Demo { scan, seed } => handle_demo(scan, seed, global).await,
         Commands::Report { session, format } => handle_report(session, format, global).await,
-        Commands::History { session, agent, since, until, min_risk, delete } => handle_history(session, agent, since, until, min_risk, delete, global).await,
+        Commands::History {
+            session,
+            agent,
+            since,
+            until,
+            min_risk,
+            delete,
+        } => handle_history(session, agent, since, until, min_risk, delete, global).await,
         Commands::Daemon { action } => handle_daemon(action, global).await,
         Commands::Profiles { action } => handle_profiles(action, global).await,
     }
@@ -715,8 +722,16 @@ async fn handle_history(
         None => {
             let filter = history::ListFilter {
                 agent,
-                since: since.as_ref().and_then(|s| DateTime::parse_from_rfc3339(s).ok().map(|dt| dt.with_timezone(&Utc))),
-                until: until.as_ref().and_then(|s| DateTime::parse_from_rfc3339(s).ok().map(|dt| dt.with_timezone(&Utc))),
+                since: since.as_ref().and_then(|s| {
+                    DateTime::parse_from_rfc3339(s)
+                        .ok()
+                        .map(|dt| dt.with_timezone(&Utc))
+                }),
+                until: until.as_ref().and_then(|s| {
+                    DateTime::parse_from_rfc3339(s)
+                        .ok()
+                        .map(|dt| dt.with_timezone(&Utc))
+                }),
                 min_risk,
             };
             history::list(filter).await
