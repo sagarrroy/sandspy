@@ -1,4 +1,5 @@
 use anyhow::Result;
+use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand, ValueEnum};
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -101,9 +102,24 @@ enum Commands {
     },
     /// Browse session history
     History {
-        /// Session ID for details
+        /// Session ID for details or delete
         #[arg(long)]
         session: Option<String>,
+        /// Filter by agent name (substring match)
+        #[arg(long)]
+        agent: Option<String>,
+        /// Filter sessions since this ISO timestamp (e.g. 2026-01-01)
+        #[arg(long)]
+        since: Option<String>,
+        /// Filter sessions until this ISO timestamp
+        #[arg(long)]
+        until: Option<String>,
+        /// Filter sessions with risk score >= N
+        #[arg(long)]
+        min_risk: Option<u32>,
+        /// Delete the specified session
+        #[arg(long)]
+        delete: bool,
     },
     /// Manage background daemon
     Daemon {
@@ -230,7 +246,7 @@ async fn handle_command(
         Commands::Attach { pid, name } => handle_attach(pid, name, global, config.clone()).await,
         Commands::Demo { scan, seed } => handle_demo(scan, seed, global).await,
         Commands::Report { session, format } => handle_report(session, format, global).await,
-        Commands::History { session } => handle_history(session, global).await,
+        Commands::History { session, agent, since, until, min_risk, delete } => handle_history(session, agent, since, until, min_risk, delete, global).await,
         Commands::Daemon { action } => handle_daemon(action, global).await,
         Commands::Profiles { action } => handle_profiles(action, global).await,
     }
@@ -678,10 +694,33 @@ async fn handle_report(
     Ok(())
 }
 
-async fn handle_history(session: Option<String>, _global: GlobalOptions) -> Result<()> {
+async fn handle_history(
+    session: Option<String>,
+    agent: Option<String>,
+    since: Option<String>,
+    until: Option<String>,
+    min_risk: Option<u32>,
+    delete: bool,
+    _global: GlobalOptions,
+) -> Result<()> {
+    if delete {
+        if let Some(session_id) = session {
+            return history::delete(&session_id).await;
+        } else {
+            anyhow::bail!("--session is required with --delete");
+        }
+    }
     match session {
         Some(session_id) => history::show(&session_id).await,
-        None => history::list().await,
+        None => {
+            let filter = history::ListFilter {
+                agent,
+                since: since.as_ref().and_then(|s| DateTime::parse_from_rfc3339(s).ok().map(|dt| dt.with_timezone(&Utc))),
+                until: until.as_ref().and_then(|s| DateTime::parse_from_rfc3339(s).ok().map(|dt| dt.with_timezone(&Utc))),
+                min_risk,
+            };
+            history::list(filter).await
+        }
     }
 }
 

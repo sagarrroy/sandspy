@@ -1,16 +1,16 @@
 // sandspy::report — Report generation
 
-use crate::events::{Event, EventKind, NetCategory, RiskLevel};
-use crate::ui::summary::{self, Finding, SessionData};
+use crate::events::{Event, RiskLevel};
+use crate::ui::summary::{self, extract_findings, SessionData};
 use anyhow::{Context, Result};
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use serde::{Deserialize, Serialize};
-use std::cmp::Reverse;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 
 pub mod html;
+pub mod json;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionMetadata {
@@ -125,75 +125,6 @@ fn resolve_session_dir(session_id: &str) -> Result<PathBuf> {
         .into_iter()
         .next()
         .with_context(|| format!("session not found: {session_id}"))
-}
-
-pub fn extract_findings(events: &[Event]) -> Vec<Finding> {
-    let mut findings = Vec::new();
-
-    for event in events {
-        match &event.kind {
-            EventKind::FileRead {
-                path,
-                sensitive: true,
-                ..
-            } => findings.push(Finding {
-                severity: RiskLevel::Critical,
-                message: format!("{} was read by agent", path.display()),
-            }),
-            EventKind::NetworkConnection {
-                domain,
-                remote_addr,
-                remote_port,
-                category: NetCategory::Unknown,
-                ..
-            } => {
-                let host = domain
-                    .as_deref()
-                    .map(|name| format!("{name}:{remote_port}"))
-                    .unwrap_or_else(|| format!("{remote_addr}:{remote_port}"));
-                findings.push(Finding {
-                    severity: RiskLevel::High,
-                    message: format!("unknown network destination: {host}"),
-                });
-            }
-            EventKind::ShellCommand {
-                command,
-                risk: RiskLevel::Critical,
-                ..
-            } => findings.push(Finding {
-                severity: RiskLevel::Critical,
-                message: format!("dangerous command: {command}"),
-            }),
-            EventKind::ShellCommand {
-                command,
-                risk: RiskLevel::High,
-                ..
-            } => findings.push(Finding {
-                severity: RiskLevel::High,
-                message: format!("high-risk command: {command}"),
-            }),
-            EventKind::Alert { message, severity } => findings.push(Finding {
-                severity: *severity,
-                message: message.clone(),
-            }),
-            EventKind::SecretAccess { name, source } => findings.push(Finding {
-                severity: RiskLevel::Critical,
-                message: format!("accessed secret {} via {:?}", name, source),
-            }),
-            EventKind::ClipboardRead {
-                contains_secret: true,
-                ..
-            } => findings.push(Finding {
-                severity: RiskLevel::Critical,
-                message: "read secret from clipboard".to_string(),
-            }),
-            _ => {}
-        }
-    }
-
-    findings.sort_by_key(|x| Reverse(x.severity));
-    findings.truncate(10);
-    findings
 }
 
 #[cfg(test)]

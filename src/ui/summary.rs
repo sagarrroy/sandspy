@@ -191,7 +191,7 @@ fn compute_stats(events: &[Event]) -> ComputedStats {
     s
 }
 
-fn extract_findings(events: &[Event]) -> Vec<Finding> {
+pub(crate) fn extract_findings(events: &[Event]) -> Vec<Finding> {
     let mut findings: Vec<Finding> = Vec::new();
 
     for event in events {
@@ -248,6 +248,17 @@ fn extract_findings(events: &[Event]) -> Vec<Finding> {
                     message: message.clone(),
                 });
             }
+            EventKind::SecretAccess { name, source } => findings.push(Finding {
+                severity: RiskLevel::Critical,
+                message: format!("accessed secret {} via {:?}", name, source),
+            }),
+            EventKind::ClipboardRead {
+                contains_secret: true,
+                ..
+            } => findings.push(Finding {
+                severity: RiskLevel::Critical,
+                message: "read secret from clipboard".to_string(),
+            }),
             _ => {}
         }
     }

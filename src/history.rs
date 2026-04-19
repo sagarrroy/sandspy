@@ -9,6 +9,7 @@ use std::cmp::Reverse;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
+use tracing::warn;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionMetadata {
@@ -18,6 +19,15 @@ pub struct SessionMetadata {
     pub risk_score: u32,
     pub event_count: usize,
     pub timestamp: DateTime<Utc>,
+}
+
+/// Filters for listing sessions.
+#[derive(Debug, Default)]
+pub struct ListFilter {
+    pub agent: Option<String>,
+    pub since: Option<DateTime<Utc>>,
+    pub until: Option<DateTime<Utc>>,
+    pub min_risk: Option<u32>,
 }
 
 pub fn persist_session(metadata: &SessionMetadata, events: &[Event]) -> Result<String> {
@@ -50,8 +60,9 @@ pub fn persist_session(metadata: &SessionMetadata, events: &[Event]) -> Result<S
     Ok(session_id)
 }
 
-pub async fn list() -> Result<()> {
+pub async fn list(filter: ListFilter) -> Result<()> {
     let mut sessions = load_all_sessions()?;
+    apply_filter(&mut sessions, &filter);
     sessions.sort_by_key(|x| Reverse(x.1.timestamp));
 
     if sessions.is_empty() {
@@ -80,6 +91,14 @@ pub async fn list() -> Result<()> {
     Ok(())
 }
 
+pub async fn delete(session_id: &str) -> Result<()> {
+    let session_dir = find_session_dir(session_id)?;
+    fs::remove_dir_all(&session_dir)
+        .with_context(|| format!("failed to delete session: {}", session_dir.display()))?;
+    println!("deleted session: {}", session_id);
+    Ok(())
+}
+
 pub async fn show(session_id: &str) -> Result<()> {
     let session_dir = find_session_dir(session_id)?;
     let metadata = read_metadata(&session_dir.join("metadata.json"))?;
@@ -105,6 +124,23 @@ fn sessions_root() -> PathBuf {
     home.join(".sandspy").join("sessions")
 }
 
+fn apply_filter(sessions: &mut Vec<(String, SessionMetadata)>, filter: &ListFilter) {
+    if let Some(ref agent) = filter.agent {
+        sessions.retain(|(_, m)| {
+            m.agent_name.to_lowercase().contains(&agent.to_lowercase())
+        });
+    }
+    if let Some(since) = filter.since {
+        sessions.retain(|(_, m)| m.timestamp >= since);
+    }
+    if let Some(until) = filter.until {
+        sessions.retain(|(_, m)| m.timestamp <= until);
+    }
+    if let Some(min_risk) = filter.min_risk {
+        sessions.retain(|(_, m)| m.risk_score >= min_risk);
+    }
+}
+
 fn load_all_sessions() -> Result<Vec<(String, SessionMetadata)>> {
     let root = sessions_root();
     if !root.exists() {
@@ -117,7 +153,10 @@ fn load_all_sessions() -> Result<Vec<(String, SessionMetadata)>> {
     {
         let entry = match entry {
             Ok(value) => value,
-            Err(_) => continue,
+            Err(e) => {
+                warn!("failed to read session directory entry: {}", e);
+                continue;
+            }
         };
         let path = entry.path();
         if !path.is_dir() {
@@ -175,13 +214,19 @@ fn read_events_jsonl(path: &Path) -> Result<Vec<Event>> {
     for line in reader.lines() {
         let line = match line {
             Ok(value) => value,
-            Err(_) => continue,
+            Err(e) => {
+                warn!("failed to read line in events file {}: {}", path.display(), e);
+                continue;
+            }
         };
         if line.trim().is_empty() {
             continue;
         }
-        if let Ok(event) = serde_json::from_str::<Event>(&line) {
-            events.push(event);
+        match serde_json::from_str::<Event>(&line) {
+            Ok(event) => events.push(event),
+            Err(e) => {
+                warn!("dropping malformed event in {}: {}", path.display(), e);
+            }
         }
     }
 
@@ -222,6 +267,35 @@ mod tests {
     fn test_truncate() {
         assert_eq!(truncate("hello", 10), "hello");
         assert_eq!(truncate("hello", 4), "hel…");
+    }
+
+    #[test]
+    fn test_apply_filter() {
+        let ts1 = chrono::Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
+        let ts2 = chrono::Utc.with_ymd_and_hms(2026, 2, 1, 0, 0, 0).unwrap();
+        let ts3 = chrono::Utc.with_ymd_and_hms(2026, 3, 1, 0, 0, 0).unwrap();
+
+        let all = vec![
+            ("s1".to_string(), SessionMetadata { agent_name: "cursor".into(), pid: None, timestamp: ts1, duration: 0, event_count: 0, risk_score: 30 }),
+            ("s2".to_string(), SessionMetadata { agent_name: "windsurf".into(), pid: None, timestamp: ts2, duration: 0, event_count: 0, risk_score: 70 }),
+            ("s3".to_string(), SessionMetadata { agent_name: "cursor".into(), pid: None, timestamp: ts3, duration: 0, event_count: 0, risk_score: 10 }),
+        ];
+
+        let mut sessions = all.clone();
+        let f = ListFilter { agent: Some("cursor".into()), since: None, until: None, min_risk: None };
+        apply_filter(&mut sessions, &f);
+        assert_eq!(sessions.len(), 2);
+
+        let mut sessions = all.clone();
+        let f = ListFilter { agent: None, since: None, until: None, min_risk: Some(50) };
+        apply_filter(&mut sessions, &f);
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].0, "s2");
+
+        let mut sessions = all.clone();
+        let f = ListFilter { agent: None, since: Some(ts2), until: None, min_risk: None };
+        apply_filter(&mut sessions, &f);
+        assert_eq!(sessions.len(), 2);
     }
 
     #[test]
